@@ -1,277 +1,414 @@
 """
-Real-Time Anomaly Detection System
-Main pipeline with modular detectors for cybersecurity monitoring
-Demonstrates real-time streaming concepts without Pathway dependency
+Real-Time Cybersecurity Anomaly Detection System using Pathway
+Hackathon MVP - Instant anomaly detection with AI-powered alerts
 """
 
-import json
-import time
+import pathway as pw
+from pathway.stdlib.ml.index import KNNIndex
+import pandas as pd
+import numpy as np
 from datetime import datetime, timedelta
-from typing import Dict, Any, List
+import json
+import requests
+import os
+from typing import Dict, List, Optional
 import logging
-import threading
-import queue
-import random
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-class AnomalyDetector:
-    """Base class for anomaly detection modules"""
+# ==================== Configuration ====================
+class Config:
+    """Central configuration for the anomaly detection system"""
     
-    def __init__(self, name: str, risk_threshold: float = 0.7):
-        self.name = name
-        self.risk_threshold = risk_threshold
-        self.baseline_data = {}
-        
-    def calculate_risk_score(self, event: Dict[str, Any]) -> float:
-        """Calculate risk score for an event (0-1 scale)"""
-        raise NotImplementedError
-        
-    def is_anomaly(self, event: Dict[str, Any]) -> bool:
-        """Check if event is anomalous"""
-        return self.calculate_risk_score(event) >= self.risk_threshold
+    # Thresholds for anomaly detection
+    LOGIN_TIME_THRESHOLD = 22  # Hour after which login is suspicious (10 PM)
+    LOGIN_TIME_EARLY_THRESHOLD = 5  # Hour before which login is suspicious (5 AM)
+    TRAFFIC_SPIKE_MULTIPLIER = 10  # Traffic spike threshold (10x normal)
+    FILE_SIZE_THRESHOLD_MB = 100  # Large file transfer threshold
+    
+    # Baseline values (would be learned in production)
+    BASELINE_TRAFFIC_RPM = 100  # Normal requests per minute
+    BASELINE_FILE_SIZE_MB = 10  # Normal file size
+    
+    # Alert endpoints
+    SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
+    
+    # LLM Configuration (using local Ollama or OpenAI)
+    USE_LLM = os.getenv("USE_LLM", "false").lower() == "true"
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OLLAMA_URL = "http://localhost:11434/api/generate"
 
-class LoginAnomalyDetector(AnomalyDetector):
-    """Detects suspicious login patterns"""
+# ==================== Data Schemas ====================
+class LoginSchema(pw.Schema):
+    username: str
+    location: str
+    timestamp: str
+    ip_address: str
+
+class NetworkTrafficSchema(pw.Schema):
+    timestamp: str
+    requests_per_minute: int
+    source_ip: str
+    
+class FileTransferSchema(pw.Schema):
+    username: str
+    timestamp: str
+    file_size_mb: float
+    operation: str  # upload/download
+    filename: str
+
+# ==================== Anomaly Detectors ====================
+class LoginAnomalyDetector:
+    """Detects unusual login patterns"""
     
     def __init__(self):
-        super().__init__("Login Anomaly Detector", 0.6)
-        self.user_baselines = {}
-        self.suspicious_countries = {"Russia", "China", "North Korea", "Iran"}
+        self.user_profiles = {}  # Store normal behavior patterns
         
-    def calculate_risk_score(self, event: Dict[str, Any]) -> float:
-        user_id = event.get("user_id", "")
-        country = event.get("country", "")
-        hour = event.get("hour", 12)
-        
-        risk_score = 0.0
-        
-        # Check for suspicious country
-        if country in self.suspicious_countries:
-            risk_score += 0.4
+    @pw.udf
+    def detect_anomaly(self, username: str, location: str, timestamp: str, ip_address: str) -> Optional[Dict]:
+        """
+        Detect login anomalies based on location and time
+        Returns anomaly details if detected, None otherwise
+        """
+        try:
+            dt = datetime.fromisoformat(timestamp)
+            hour = dt.hour
             
-        # Check for unusual login time (outside 6 AM - 10 PM)
-        if hour < 6 or hour > 22:
-            risk_score += 0.3
-            
-        # Check for new country for user
-        if user_id not in self.user_baselines:
-            self.user_baselines[user_id] = {"countries": set(), "hours": []}
-            
-        if country not in self.user_baselines[user_id]["countries"]:
-            risk_score += 0.3
-            
-        # Update baseline
-        self.user_baselines[user_id]["countries"].add(country)
-        self.user_baselines[user_id]["hours"].append(hour)
-        
-        return min(risk_score, 1.0)
-
-class NetworkTrafficDetector(AnomalyDetector):
-    """Detects network traffic anomalies"""
-    
-    def __init__(self):
-        super().__init__("Network Traffic Detector", 0.7)
-        self.traffic_baseline = 1000  # requests per minute
-        self.traffic_history = []
-        
-    def calculate_risk_score(self, event: Dict[str, Any]) -> float:
-        requests_per_minute = event.get("requests_per_minute", 0)
-        
-        # Calculate moving average
-        self.traffic_history.append(requests_per_minute)
-        if len(self.traffic_history) > 10:
-            self.traffic_history.pop(0)
-            
-        avg_traffic = sum(self.traffic_history) / len(self.traffic_history)
-        
-        # Check for traffic spike (100x normal)
-        if requests_per_minute > avg_traffic * 100:
-            return 1.0
-            
-        # Check for significant increase (10x normal)
-        if requests_per_minute > avg_traffic * 10:
-            return 0.8
-            
-        # Check for moderate increase (3x normal)
-        if requests_per_minute > avg_traffic * 3:
-            return 0.5
-            
-        return 0.0
-
-class FileTransferDetector(AnomalyDetector):
-    """Detects suspicious file transfer patterns"""
-    
-    def __init__(self):
-        super().__init__("File Transfer Detector", 0.6)
-        self.user_transfer_baselines = {}
-        
-    def calculate_risk_score(self, event: Dict[str, Any]) -> float:
-        user_id = event.get("user_id", "")
-        file_size_mb = event.get("file_size_mb", 0)
-        file_type = event.get("file_type", "")
-        
-        risk_score = 0.0
-        
-        # Check for large file transfer (>100MB)
-        if file_size_mb > 100:
-            risk_score += 0.4
-            
-        # Check for sensitive file types
-        sensitive_types = {".zip", ".rar", ".7z", ".sql", ".db", ".csv"}
-        if any(file_type.endswith(ext) for ext in sensitive_types):
-            risk_score += 0.3
-            
-        # Check for unusual transfer size for user
-        if user_id not in self.user_transfer_baselines:
-            self.user_transfer_baselines[user_id] = {"avg_size": 10, "count": 0}
-            
-        baseline = self.user_transfer_baselines[user_id]
-        if file_size_mb > baseline["avg_size"] * 5:
-            risk_score += 0.3
-            
-        # Update baseline
-        baseline["count"] += 1
-        baseline["avg_size"] = (baseline["avg_size"] * (baseline["count"] - 1) + file_size_mb) / baseline["count"]
-        
-        return min(risk_score, 1.0)
-
-class PathwayAnomalyDetectionSystem:
-    """Main Pathway-based anomaly detection system"""
-    
-    def __init__(self):
-        self.detectors = {
-            "login": LoginAnomalyDetector(),
-            "network": NetworkTrafficDetector(),
-            "file_transfer": FileTransferDetector()
-        }
-        self.alerts = []
-        
-    def process_event(self, event: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Process a single event through all detectors"""
-        event_type = event.get("type", "")
-        alerts = []
-        
-        if event_type in self.detectors:
-            detector = self.detectors[event_type]
-            risk_score = detector.calculate_risk_score(event)
-            
-            if detector.is_anomaly(event):
-                alert = {
-                    "timestamp": datetime.now().isoformat(),
-                    "event_type": event_type,
-                    "risk_score": risk_score,
-                    "event_data": event,
-                    "detector": detector.name,
-                    "explanation": self._generate_explanation(event, detector, risk_score)
+            # Initialize user profile if new user
+            if username not in self.user_profiles:
+                self.user_profiles[username] = {
+                    'locations': {location},
+                    'normal_hours': set(range(7, 22)),  # 7 AM to 10 PM
+                    'ip_addresses': {ip_address}
                 }
-                alerts.append(alert)
-                self.alerts.append(alert)
+                return None  # First login, no anomaly
+            
+            profile = self.user_profiles[username]
+            anomalies = []
+            
+            # Check for unusual location
+            if location not in profile['locations']:
+                anomalies.append({
+                    'type': 'unusual_location',
+                    'severity': 'HIGH',
+                    'details': f"Login from new location: {location}"
+                })
+                profile['locations'].add(location)
+            
+            # Check for unusual time
+            if hour >= Config.LOGIN_TIME_THRESHOLD or hour <= Config.LOGIN_TIME_EARLY_THRESHOLD:
+                anomalies.append({
+                    'type': 'unusual_time',
+                    'severity': 'MEDIUM',
+                    'details': f"Login at unusual hour: {hour:02d}:00"
+                })
+            
+            # Check for new IP address
+            if ip_address not in profile['ip_addresses']:
+                anomalies.append({
+                    'type': 'new_ip',
+                    'severity': 'LOW',
+                    'details': f"Login from new IP: {ip_address}"
+                })
+                profile['ip_addresses'].add(ip_address)
+            
+            if anomalies:
+                return {
+                    'username': username,
+                    'location': location,
+                    'timestamp': timestamp,
+                    'anomalies': anomalies,
+                    'risk_score': len(anomalies) * 30  # Simple risk scoring
+                }
                 
-        return alerts
-    
-    def _generate_explanation(self, event: Dict[str, Any], detector: AnomalyDetector, risk_score: float) -> str:
-        """Generate human-readable explanation for the anomaly"""
-        explanations = []
-        
-        if detector.name == "Login Anomaly Detector":
-            user_id = event.get("user_id", "unknown")
-            country = event.get("country", "unknown")
-            hour = event.get("hour", 12)
+        except Exception as e:
+            logger.error(f"Error in login anomaly detection: {e}")
             
-            if country in {"Russia", "China", "North Korea", "Iran"}:
-                explanations.append(f"Login from suspicious country: {country}")
-            if hour < 6 or hour > 22:
-                explanations.append(f"Unusual login time: {hour}:00")
-            if "new country" in str(event):
-                explanations.append("First login from this country")
+        return None
+
+class NetworkAnomalyDetector:
+    """Detects network traffic anomalies (DDoS patterns)"""
+    
+    def __init__(self):
+        self.traffic_history = []
+        self.baseline_rpm = Config.BASELINE_TRAFFIC_RPM
+        
+    @pw.udf
+    def detect_anomaly(self, timestamp: str, requests_per_minute: int, source_ip: str) -> Optional[Dict]:
+        """
+        Detect traffic spikes that might indicate DDoS
+        """
+        try:
+            # Update rolling average (simplified for MVP)
+            self.traffic_history.append(requests_per_minute)
+            if len(self.traffic_history) > 10:
+                self.traffic_history.pop(0)
+                self.baseline_rpm = np.mean(self.traffic_history[:-1])
+            
+            # Check for traffic spike
+            if requests_per_minute > self.baseline_rpm * Config.TRAFFIC_SPIKE_MULTIPLIER:
+                spike_ratio = requests_per_minute / self.baseline_rpm
+                return {
+                    'timestamp': timestamp,
+                    'requests_per_minute': requests_per_minute,
+                    'baseline': self.baseline_rpm,
+                    'spike_ratio': spike_ratio,
+                    'source_ip': source_ip,
+                    'severity': 'CRITICAL' if spike_ratio > 50 else 'HIGH',
+                    'anomaly_type': 'traffic_spike',
+                    'details': f"Traffic {spike_ratio:.1f}x higher than normal"
+                }
                 
-        elif detector.name == "Network Traffic Detector":
-            requests = event.get("requests_per_minute", 0)
-            explanations.append(f"Traffic spike detected: {requests} requests/minute")
+        except Exception as e:
+            logger.error(f"Error in network anomaly detection: {e}")
             
-        elif detector.name == "File Transfer Detector":
-            file_size = event.get("file_size_mb", 0)
-            file_type = event.get("file_type", "")
-            explanations.append(f"Large file transfer: {file_size}MB {file_type}")
-            
-        if not explanations:
-            explanations.append("Anomalous pattern detected")
-            
-        return " | ".join(explanations)
-    
-    def get_recent_alerts(self, minutes: int = 60) -> List[Dict[str, Any]]:
-        """Get alerts from the last N minutes"""
-        cutoff = datetime.now() - timedelta(minutes=minutes)
-        return [
-            alert for alert in self.alerts 
-            if datetime.fromisoformat(alert["timestamp"]) > cutoff
-        ]
-    
-    def get_risk_summary(self) -> Dict[str, Any]:
-        """Get overall risk summary"""
-        recent_alerts = self.get_recent_alerts(60)
-        
-        if not recent_alerts:
-            return {"overall_risk": "LOW", "score": 0, "alert_count": 0}
-            
-        avg_risk = sum(alert["risk_score"] for alert in recent_alerts) / len(recent_alerts)
-        alert_count = len(recent_alerts)
-        
-        if avg_risk > 0.8:
-            risk_level = "CRITICAL"
-        elif avg_risk > 0.6:
-            risk_level = "HIGH"
-        elif avg_risk > 0.4:
-            risk_level = "MEDIUM"
-        else:
-            risk_level = "LOW"
-            
-        return {
-            "overall_risk": risk_level,
-            "score": avg_risk,
-            "alert_count": alert_count,
-            "recent_alerts": recent_alerts[-5:]  # Last 5 alerts
-        }
+        return None
 
-def main():
-    """Main function to run the anomaly detection system"""
-    print("🚀 Starting Real-Time Anomaly Detection System...")
-    print("📊 Monitoring: Login patterns, Network traffic, File transfers")
-    print("⚡ Powered by Pathway for zero-latency processing")
-    print("-" * 60)
+class FileTransferAnomalyDetector:
+    """Detects suspicious file transfers (potential exfiltration)"""
     
-    # Initialize the detection system
-    detection_system = PathwayAnomalyDetectionSystem()
-    
-    # Simulate real-time event processing
-    try:
-        while True:
-            # In a real system, this would read from Kafka, Kinesis, etc.
-            # For demo purposes, we'll simulate events
-            time.sleep(1)
-            
-            # Check for new alerts
-            recent_alerts = detection_system.get_recent_alerts(1)
-            if recent_alerts:
-                for alert in recent_alerts:
-                    print(f"🚨 ALERT: {alert['detector']}")
-                    print(f"   Risk Score: {alert['risk_score']:.2f}")
-                    print(f"   Explanation: {alert['explanation']}")
-                    print(f"   Time: {alert['timestamp']}")
-                    print("-" * 40)
-                    
-    except KeyboardInterrupt:
-        print("\n🛑 Anomaly detection system stopped.")
+    def __init__(self):
+        self.user_patterns = {}
         
-        # Print final summary
-        summary = detection_system.get_risk_summary()
-        print(f"\n📈 Final Risk Summary:")
-        print(f"   Overall Risk: {summary['overall_risk']}")
-        print(f"   Average Score: {summary['score']:.2f}")
-        print(f"   Total Alerts: {summary['alert_count']}")
+    @pw.udf
+    def detect_anomaly(self, username: str, timestamp: str, file_size_mb: float, 
+                       operation: str, filename: str) -> Optional[Dict]:
+        """
+        Detect abnormally large file transfers
+        """
+        try:
+            # Initialize user pattern if new
+            if username not in self.user_patterns:
+                self.user_patterns[username] = {
+                    'avg_size': Config.BASELINE_FILE_SIZE_MB,
+                    'max_size': Config.BASELINE_FILE_SIZE_MB,
+                    'transfer_count': 0
+                }
+            
+            pattern = self.user_patterns[username]
+            anomalies = []
+            
+            # Check for large file transfer
+            if file_size_mb > Config.FILE_SIZE_THRESHOLD_MB:
+                anomalies.append({
+                    'type': 'large_transfer',
+                    'severity': 'HIGH' if operation == 'download' else 'CRITICAL',
+                    'details': f"Large {operation}: {file_size_mb:.1f}MB"
+                })
+            
+            # Check if significantly larger than user's normal
+            if file_size_mb > pattern['max_size'] * 5:
+                anomalies.append({
+                    'type': 'unusual_size_for_user',
+                    'severity': 'MEDIUM',
+                    'details': f"File size {file_size_mb/pattern['avg_size']:.1f}x larger than usual"
+                })
+            
+            # Update user pattern
+            pattern['transfer_count'] += 1
+            pattern['avg_size'] = (pattern['avg_size'] * (pattern['transfer_count'] - 1) + file_size_mb) / pattern['transfer_count']
+            pattern['max_size'] = max(pattern['max_size'], file_size_mb)
+            
+            if anomalies:
+                return {
+                    'username': username,
+                    'timestamp': timestamp,
+                    'file_size_mb': file_size_mb,
+                    'operation': operation,
+                    'filename': filename,
+                    'anomalies': anomalies,
+                    'risk_score': sum(30 if a['severity'] == 'CRITICAL' else 20 if a['severity'] == 'HIGH' else 10 
+                                     for a in anomalies)
+                }
+                
+        except Exception as e:
+            logger.error(f"Error in file transfer anomaly detection: {e}")
+            
+        return None
 
+# ==================== Alert System ====================
+class AlertSystem:
+    """Manages alert generation and distribution"""
+    
+    @staticmethod
+    def generate_llm_explanation(anomaly: Dict) -> str:
+        """
+        Generate human-readable explanation using LLM (optional)
+        Falls back to template-based messages if LLM unavailable
+        """
+        if not Config.USE_LLM:
+            return AlertSystem._generate_template_explanation(anomaly)
+        
+        try:
+            # Try OpenAI first, then Ollama
+            if Config.OPENAI_API_KEY:
+                return AlertSystem._openai_explain(anomaly)
+            else:
+                return AlertSystem._ollama_explain(anomaly)
+        except:
+            return AlertSystem._generate_template_explanation(anomaly)
+    
+    @staticmethod
+    def _generate_template_explanation(anomaly: Dict) -> str:
+        """Template-based alert messages"""
+        if 'anomaly_type' in anomaly and anomaly['anomaly_type'] == 'traffic_spike':
+            return (f"🚨 NETWORK ALERT: Detected traffic spike! "
+                   f"Current: {anomaly['requests_per_minute']} req/min "
+                   f"(Normal: ~{anomaly['baseline']:.0f} req/min). "
+                   f"This is {anomaly['spike_ratio']:.1f}x higher than baseline. "
+                   f"Possible DDoS attack in progress from {anomaly['source_ip']}.")
+        
+        elif 'operation' in anomaly:  # File transfer
+            return (f"📁 FILE TRANSFER ALERT: User '{anomaly['username']}' "
+                   f"performed {anomaly['operation']} of {anomaly['file_size_mb']:.1f}MB file "
+                   f"'{anomaly['filename']}'. Risk score: {anomaly['risk_score']}/100. "
+                   f"Possible data exfiltration attempt.")
+        
+        elif 'location' in anomaly:  # Login
+            alerts = anomaly['anomalies']
+            alert_msgs = [a['details'] for a in alerts]
+            return (f"🔐 LOGIN ALERT: User '{anomaly['username']}' login anomaly detected. "
+                   f"Issues: {', '.join(alert_msgs)}. "
+                   f"Risk score: {anomaly['risk_score']}/100.")
+        
+        return f"⚠️ ANOMALY DETECTED: {json.dumps(anomaly)}"
+    
+    @staticmethod
+    def _openai_explain(anomaly: Dict) -> str:
+        """Use OpenAI to generate explanation"""
+        # Implementation would go here
+        return AlertSystem._generate_template_explanation(anomaly)
+    
+    @staticmethod
+    def _ollama_explain(anomaly: Dict) -> str:
+        """Use Ollama local LLM to generate explanation"""
+        # Implementation would go here
+        return AlertSystem._generate_template_explanation(anomaly)
+    
+    @staticmethod
+    @pw.udf
+    def send_alert(anomaly: Dict) -> None:
+        """Send alerts to various channels"""
+        if not anomaly:
+            return
+            
+        message = AlertSystem.generate_llm_explanation(anomaly)
+        
+        # Console output (always enabled)
+        logger.warning(f"\n{'='*60}\n{message}\n{'='*60}")
+        
+        # Slack webhook
+        if Config.SLACK_WEBHOOK_URL:
+            try:
+                requests.post(Config.SLACK_WEBHOOK_URL, 
+                            json={"text": message},
+                            timeout=5)
+            except Exception as e:
+                logger.error(f"Failed to send Slack alert: {e}")
+        
+        # Discord webhook
+        if Config.DISCORD_WEBHOOK_URL:
+            try:
+                requests.post(Config.DISCORD_WEBHOOK_URL,
+                            json={"content": message},
+                            timeout=5)
+            except Exception as e:
+                logger.error(f"Failed to send Discord alert: {e}")
+
+# ==================== Main Pipeline ====================
+def create_anomaly_detection_pipeline():
+    """
+    Create the main Pathway pipeline for real-time anomaly detection
+    """
+    # Initialize detectors
+    login_detector = LoginAnomalyDetector()
+    network_detector = NetworkAnomalyDetector()
+    file_detector = FileTransferAnomalyDetector()
+    
+    # Create input connectors (CSV for MVP, can swap to Kafka)
+    # These watch directories for new CSV files in real-time
+    
+    # Login stream
+    login_table = pw.io.csv.read(
+        './data/login_stream/',
+        schema=LoginSchema,
+        mode='streaming'
+    )
+    
+    # Network traffic stream
+    network_table = pw.io.csv.read(
+        './data/network_stream/',
+        schema=NetworkTrafficSchema,
+        mode='streaming'
+    )
+    
+    # File transfer stream
+    file_table = pw.io.csv.read(
+        './data/file_stream/',
+        schema=FileTransferSchema,
+        mode='streaming'
+    )
+    
+    # Apply anomaly detection
+    login_anomalies = login_table.select(
+        anomaly=login_detector.detect_anomaly(
+            login_table.username,
+            login_table.location,
+            login_table.timestamp,
+            login_table.ip_address
+        )
+    ).filter(pw.this.anomaly.is_not_none())
+    
+    network_anomalies = network_table.select(
+        anomaly=network_detector.detect_anomaly(
+            network_table.timestamp,
+            network_table.requests_per_minute,
+            network_table.source_ip
+        )
+    ).filter(pw.this.anomaly.is_not_none())
+    
+    file_anomalies = file_table.select(
+        anomaly=file_detector.detect_anomaly(
+            file_table.username,
+            file_table.timestamp,
+            file_table.file_size_mb,
+            file_table.operation,
+            file_table.filename
+        )
+    ).filter(pw.this.anomaly.is_not_none())
+    
+    # Send alerts for each anomaly type
+    login_anomalies.select(alert=AlertSystem.send_alert(login_anomalies.anomaly))
+    network_anomalies.select(alert=AlertSystem.send_alert(network_anomalies.anomaly))
+    file_anomalies.select(alert=AlertSystem.send_alert(file_anomalies.anomaly))
+    
+    # Output anomalies to JSON for dashboard
+    pw.io.jsonlines.write(login_anomalies, "./output/login_anomalies.jsonl")
+    pw.io.jsonlines.write(network_anomalies, "./output/network_anomalies.jsonl")
+    pw.io.jsonlines.write(file_anomalies, "./output/file_anomalies.jsonl")
+    
+    return login_anomalies, network_anomalies, file_anomalies
+
+# ==================== Entry Point ====================
 if __name__ == "__main__":
-    main()
+    logger.info("Starting Real-Time Anomaly Detection System...")
+    logger.info(f"Monitoring directories: ./data/login_stream/, ./data/network_stream/, ./data/file_stream/")
+    
+    # Create output directory
+    os.makedirs("./output", exist_ok=True)
+    
+    # Run the pipeline
+    try:
+        login_anomalies, network_anomalies, file_anomalies = create_anomaly_detection_pipeline()
+        
+        # Run the computation
+        pw.run()
+        
+    except KeyboardInterrupt:
+        logger.info("Shutting down anomaly detection system...")
+    except Exception as e:
+        logger.error(f"Pipeline error: {e}")
+        raise
