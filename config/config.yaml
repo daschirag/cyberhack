@@ -1,0 +1,41 @@
+# Configuration file for Real-Time Anomaly Detection System
+
+# Detection thresholds
+detection:
+  login:
+    risk_threshold: 0.6
+    suspicious_countries: ["Russia", "China", "North Korea", "Iran"]
+    unusual_hours: [0, 1, 2, 3, 4, 5, 23]
+  
+  network:
+    risk_threshold: 0.7
+    traffic_baseline: 1000  # requests per minute
+    spike_multiplier: 100   # 100x normal traffic
+  
+  file_transfer:
+    risk_threshold: 0.6
+    large_file_threshold: 100  # MB
+    sensitive_extensions: [".zip", ".rar", ".7z", ".sql", ".db", ".csv"]
+
+# Dashboard settings
+dashboard:
+  refresh_interval: 2  # seconds
+  max_alerts_display: 10
+  risk_levels:
+    low: 0.3
+    medium: 0.6
+    high: 0.8
+    critical: 1.0
+
+# Logging configuration
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/anomaly_detection.log"
+
+# Data generation settings
+data_generation:
+  normal_interval: [1.0, 3.0]  # seconds between events
+  attack_probability: 0.1      # 10% chance of attack events
+  users: ["john.doe", "jane.smith", "bob.wilson", "alice.brown"]
+  countries: ["USA", "Canada", "UK", "Germany", "France", "Japan"]

@@ -1,0 +1,22 @@
+# Real-Time Anomaly Detection System Dependencies
+# Core Pathway streaming framework
+pathway>=0.12.0
+
+# Dashboard and visualization
+streamlit>=1.28.0
+plotly>=5.17.0
+pandas>=2.0.0
+
+# Data processing and utilities
+numpy>=1.24.0
+python-dateutil>=2.8.0
+
+# Optional: For production deployment
+# kafka-python>=2.0.0  # Uncomment for Kafka integration
+# boto3>=1.28.0        # Uncomment for AWS Kinesis integration
+# redis>=4.6.0         # Uncomment for Redis caching
+
+# Development and testing
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
