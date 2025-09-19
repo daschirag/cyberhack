@@ -21,10 +21,24 @@ import logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Define lifespan handler first
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan events"""
+    # Startup
+    asyncio.create_task(monitor_anomalies())
+    logger.info("Anomaly monitoring started")
+    yield
+    # Shutdown (if needed)
+    logger.info("Application shutting down")
+
 app = FastAPI(
     title="Cybersecurity Anomaly Detection API",
     description="Real-time threat detection and monitoring system",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS middleware for frontend
@@ -295,14 +309,14 @@ async def monitor_anomalies():
             logger.error(f"Error in anomaly monitoring: {e}")
             await asyncio.sleep(10)
 
-@app.on_event("startup")
-async def startup_event():
-    """Start background tasks on startup"""
-    asyncio.create_task(monitor_anomalies())
-    logger.info("Anomaly monitoring started")
+# Lifespan handler is defined above with the FastAPI app
 
-# Serve static files (React build)
-app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+# Serve static files (React build) - only if directory exists
+import os
+if os.path.exists("frontend/build/static"):
+    app.mount("/static", StaticFiles(directory="frontend/build/static"), name="static")
+else:
+    logger.warning("Frontend build directory not found. Static files will not be served.")
 
 @app.get("/{full_path:path}")
 async def serve_react_app(full_path: str):

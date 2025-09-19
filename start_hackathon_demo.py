@@ -54,12 +54,13 @@ class HackathonDemo:
                 print("📦 Installing frontend dependencies...")
                 subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
             
-            # Start the frontend
+            # Start the frontend in development mode
             process = subprocess.Popen(
                 ["npm", "start"],
                 cwd=frontend_dir,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE
+                stderr=subprocess.PIPE,
+                env={**os.environ, "BROWSER": "none"}  # Prevent auto-opening browser
             )
             print("✅ Frontend started on http://localhost:3000")
             return process
