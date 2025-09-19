@@ -33,21 +33,21 @@ def start_detection_system():
     """Start the anomaly detection system"""
     print("🚀 Starting anomaly detection system...")
     return subprocess.Popen([
-        sys.executable, "src/anomaly_detection.py"
+        sys.executable, "anomaly_detection.py"
     ], cwd=Path(__file__).parent)
 
 def start_dashboard():
     """Start the Streamlit dashboard"""
     print("📊 Starting dashboard...")
     return subprocess.Popen([
-        sys.executable, "-m", "streamlit", "run", "src/dashboard.py"
+        sys.executable, "-m", "streamlit", "run", "dashboard.py"
     ], cwd=Path(__file__).parent)
 
 def start_data_generator(mode="attack"):
     """Start the data generator"""
     print(f"📡 Starting data generator in {mode} mode...")
     return subprocess.Popen([
-        sys.executable, "src/data_generator.py", "--mode", mode, "--duration", "10"
+        sys.executable, "data_generator.py", "--mode", mode, "--duration", "10"
     ], cwd=Path(__file__).parent)
 
 def main():

@@ -145,3 +145,5 @@ data/
 models/
 checkpoints/
 temp/
+/output
+/myvenv
