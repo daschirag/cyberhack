@@ -1,24 +1,37 @@
-# Real-Time Anomaly Detection System Dependencies
-# Core Pathway streaming framework
+# CyberShield - Real-Time Cybersecurity Anomaly Detection System
+# Core Dependencies
+
+# Core Framework
 pathway>=0.12.0
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
 
-# Dashboard and visualization
-streamlit>=1.28.0
-plotly>=5.17.0
+# Data Processing and Analysis
 pandas>=2.0.0
-
-# Data processing and utilities
 numpy>=1.24.0
 python-dateutil>=2.8.0
+
+# Web Framework and API
+websockets>=12.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# Environment and Configuration
 python-dotenv>=1.0.0
+
+# AI and Machine Learning (Optional)
 openai>=1.0.0
+
+# Dashboard and Visualization
+streamlit>=1.28.0
+plotly>=5.17.0
+
+# Development and Testing
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
 
 # Optional: For production deployment
 # kafka-python>=2.0.0  # Uncomment for Kafka integration
 # boto3>=1.28.0        # Uncomment for AWS Kinesis integration
 # redis>=4.6.0         # Uncomment for Redis caching
-
-# Development and testing
-pytest>=7.4.0
-black>=23.0.0
-flake8>=6.0.0

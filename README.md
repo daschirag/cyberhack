@@ -1,252 +1,351 @@
-# 🛡️ Real-Time Anomaly Detection System
+# 🛡️ CyberShield - Real-Time Cybersecurity Anomaly Detection System
 
-A production-ready cybersecurity anomaly detection system that demonstrates real-time threat detection capabilities. This system monitors multiple data streams simultaneously, detects suspicious patterns, and provides instant alerts with detailed explanations.
+A production-ready cybersecurity anomaly detection system with a modern web dashboard for real-time threat monitoring and analysis.
 
-## ✨ Key Features
+## ✨ Features
 
-- **⚡ Real-Time Processing**: Processes events as they arrive with minimal latency
-- **🔒 Multi-Layer Defense**: Monitors login patterns, network traffic, and file transfers
-- **🧠 Smart Alerting**: Risk scoring with AI-generated explanations for each threat
-- **📊 Live Dashboard**: Beautiful Streamlit UI with real-time visualizations
-- **🎯 Attack Simulation**: Built-in scenario generator for demonstrations
+- **🔍 Real-Time Detection**: Processes security events as they arrive with minimal latency
+- **🎨 Modern Dashboard**: Beautiful React-based UI with real-time updates
+- **📊 Advanced Analytics**: Interactive charts and threat intelligence
+- **🚨 Smart Alerting**: AI-powered risk scoring and alert management
+- **🌐 REST API**: Complete FastAPI backend with WebSocket support
+- **📱 Responsive Design**: Works on desktop, tablet, and mobile devices
 
-## 🏗️ How It Works
-
-### System Architecture
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Data Sources  │───▶│  Detection Engine│───▶│   Dashboard     │
 │                 │    │                  │    │                 │
-│ • Login Events  │    │ • Real-time      │    │ • Streamlit UI  │
-│ • Network Data  │    │   Processing     │    │ • Live Updates  │
-│ • File Transfers│    │ • Anomaly        │    │ • Risk Gauges   │
+│ • Login Events  │    │ • Real-time      │    │ • React UI      │
+│ • Network Data  │    │   Processing     │    │ • FastAPI       │
+│ • File Transfers│    │ • Anomaly        │    │ • WebSockets    │
 └─────────────────┘    │   Detection      │    └─────────────────┘
                        └──────────────────┘
 ```
 
-### Detection Pipeline
+## 🚀 Quick Start
 
-1. **Event Ingestion**: System receives events from multiple sources
-2. **Real-Time Processing**: Each event is processed immediately upon arrival
-3. **Anomaly Detection**: Multiple detectors analyze patterns and calculate risk scores
-4. **Alert Generation**: High-risk events trigger immediate alerts with explanations
-5. **Dashboard Updates**: Live dashboard shows real-time status and alerts
+### Prerequisites
 
-## 📦 Project Structure
+- **Python 3.8+**
+- **Node.js 16+**
+- **npm or yarn**
+
+### 1. Clone the Repository
+
+```bash
+git clone <your-repo-url>
+cd anomaly-detection-system
+```
+
+### 2. Install Dependencies
+
+#### Backend Dependencies
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+pip install -r backend/requirements.txt
+```
+
+#### Frontend Dependencies
+```bash
+# Install Node.js dependencies
+cd frontend
+npm install
+cd ..
+```
+
+### 3. Environment Setup
+
+#### Backend Environment
+```bash
+# Copy environment template
+cp env_config.txt .env
+
+# Edit .env with your API keys (optional)
+# OPENAI_API_KEY=your_openai_api_key_here
+# USE_LLM=true
+```
+
+#### Frontend Environment
+```bash
+# Copy frontend environment template
+cp frontend/env.example frontend/.env
+
+# Edit frontend/.env if needed
+# REACT_APP_API_URL=http://localhost:8000
+```
+
+### 4. Run the System
+
+#### Option A: One-Command Startup (Recommended)
+```bash
+python start_hackathon_demo.py
+```
+
+#### Option B: Manual Startup
+```bash
+# Terminal 1: Start Backend
+cd backend
+python main.py
+
+# Terminal 2: Start Frontend
+cd frontend
+npm start
+
+# Terminal 3: Start Anomaly Detection
+python anomaly_detection.py
+
+# Terminal 4: Start Data Generator (for demo)
+python data_generator.py --mode stream --anomaly-rate 0.1
+```
+
+### 5. Access the Application
+
+- **🌐 Frontend Dashboard**: http://localhost:3000
+- **🔧 Backend API**: http://localhost:8000
+- **📚 API Documentation**: http://localhost:8000/docs
+- **🔌 WebSocket**: ws://localhost:8000/ws
+
+## 📦 Dependencies
+
+### Backend Dependencies (`requirements.txt`)
+```
+# Core Framework
+pathway>=0.12.0
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+python-dateutil>=2.8.0
+
+# Web & API
+websockets>=12.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+
+# Environment & Configuration
+python-dotenv>=1.0.0
+
+# AI & ML (Optional)
+openai>=1.0.0
+
+# Development
+pytest>=7.4.0
+black>=23.0.0
+flake8>=6.0.0
+```
+
+### Backend API Dependencies (`backend/requirements.txt`)
+```
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+websockets==12.0
+python-multipart==0.0.6
+pydantic==2.5.0
+python-dotenv==1.0.0
+```
+
+### Frontend Dependencies (`frontend/package.json`)
+```json
+{
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.8.0",
+    "recharts": "^2.8.0",
+    "lucide-react": "^0.294.0",
+    "tailwindcss": "^3.3.0",
+    "axios": "^1.6.0",
+    "date-fns": "^2.30.0",
+    "react-hot-toast": "^2.4.1",
+    "framer-motion": "^10.16.0"
+  }
+}
+```
+
+## 🎮 Demo Scenarios
+
+### Normal Operations
+```bash
+python data_generator.py --mode stream --anomaly-rate 0.05
+```
+
+### Attack Simulation
+```bash
+python data_generator.py --mode attack
+```
+
+### High Threat Environment
+```bash
+python data_generator.py --mode stream --anomaly-rate 0.3
+```
+
+## 🔧 API Endpoints
+
+### Core Endpoints
+- `GET /api/anomalies` - Get all anomalies
+- `GET /api/stats` - System statistics
+- `GET /api/anomalies/recent` - Recent threats
+- `POST /api/alerts/{id}/action` - Handle alert actions
+- `WebSocket /ws` - Real-time updates
+
+### Data Format
+```json
+{
+  "timestamp": "2024-01-15T10:15:00",
+  "type": "login",
+  "severity": "HIGH",
+  "risk_score": 0.85,
+  "explanation": "Login from suspicious country",
+  "details": { ... }
+}
+```
+
+## 🎨 Frontend Features
+
+### Dashboard
+- **Threat Level Indicator**: Real-time security status
+- **Statistics Cards**: Total anomalies, critical alerts, system health
+- **Recent Alerts**: Latest security events with details
+- **Activity Timeline**: Chronological view of events
+
+### Analytics
+- **Anomaly Type Distribution**: Interactive pie charts
+- **Severity Breakdown**: Risk level analysis
+- **Time Series**: Hourly anomaly patterns
+- **Performance Metrics**: Detection accuracy and system stats
+
+### Alert Management
+- **Filter & Search**: Find specific threats
+- **Action Buttons**: Acknowledge, investigate, resolve
+- **Real-time Updates**: Live notifications via WebSocket
+- **Severity Indicators**: Color-coded threat levels
+
+## 🛡️ Detection Capabilities
+
+### Login Anomaly Detection
+- Suspicious countries and locations
+- Unusual login times
+- New IP addresses
+- Risk scoring based on multiple factors
+
+### Network Traffic Monitoring
+- Traffic spike detection (DDoS-like attacks)
+- Baseline learning and adaptation
+- Statistical anomaly detection
+- Real-time threshold monitoring
+
+### File Transfer Analysis
+- Large file transfer detection
+- Suspicious file types and patterns
+- User behavior profiling
+- Data exfiltration attempts
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+1. **Port Conflicts**
+   ```bash
+   # Change ports in configuration files
+   # Backend: backend/main.py (port 8000)
+   # Frontend: frontend/package.json (port 3000)
+   ```
+
+2. **Missing Dependencies**
+   ```bash
+   # Reinstall all dependencies
+   pip install -r requirements.txt
+   pip install -r backend/requirements.txt
+   cd frontend && npm install
+   ```
+
+3. **Permission Errors**
+   ```bash
+   # Ensure output directories exist
+   mkdir -p ./output ./data/login_stream ./data/network_stream ./data/file_stream
+   ```
+
+4. **WebSocket Connection Issues**
+   - Check firewall settings
+   - Ensure ports 8000 and 3000 are available
+   - Verify backend is running before frontend
+
+### Performance Tips
+- Use `--anomaly-rate 0.1` for smooth demo
+- Close unnecessary applications
+- Ensure stable internet connection for WebSocket
+
+## 📁 Project Structure
 
 ```
 anomaly-detection-system/
-├── src/
-│   ├── anomaly_detection.py    # Main detection engine with modular detectors
-│   ├── data_generator.py       # Event simulator with attack scenarios
-│   └── dashboard.py            # Streamlit dashboard with live updates
-├── config/
-│   └── config.yaml            # Configuration settings
-├── requirements.txt           # Python dependencies
-├── run_demo.py               # Demo runner script
-└── README.md                 # This file
+├── backend/                 # FastAPI backend
+│   ├── main.py             # Main API server
+│   └── requirements.txt    # Backend dependencies
+├── frontend/               # React frontend
+│   ├── src/               # Source code
+│   │   ├── components/    # React components
+│   │   ├── context/       # React context
+│   │   └── App.js         # Main app component
+│   ├── public/            # Static files
+│   └── package.json       # Frontend dependencies
+├── data/                  # Data streams
+│   ├── login_stream/      # Login event data
+│   ├── network_stream/    # Network traffic data
+│   └── file_stream/       # File transfer data
+├── output/                # Anomaly outputs
+├── anomaly_detection.py   # Main detection engine
+├── data_generator.py      # Demo data generator
+├── start_hackathon_demo.py # One-command startup
+├── requirements.txt       # Main dependencies
+└── README.md             # This file
 ```
 
-## 🚀 Quick Start
+## 🏆 Hackathon Features
 
-### 1. Installation
+### Technical Excellence
+- **Real-time Processing**: Sub-second threat detection
+- **Modern Stack**: React, FastAPI, WebSockets
+- **Production Ready**: Error handling, logging, monitoring
+- **Scalable Architecture**: Microservices design
 
-```bash
-# Clone or download the project
-cd anomaly-detection-system
+### User Experience
+- **Intuitive Interface**: Easy to understand and use
+- **Responsive Design**: Works on all devices
+- **Real-time Updates**: Live notifications and alerts
+- **Professional Look**: Enterprise-grade appearance
 
-# Install dependencies
-pip install -r requirements.txt
-```
+### Innovation
+- **Multi-Vector Detection**: Comprehensive threat monitoring
+- **AI Integration**: Smart risk assessment
+- **Real-time Analytics**: Live threat intelligence
+- **Actionable Insights**: Clear next steps for security teams
 
-### 2. Run the System
+## 🤝 Contributing
 
-**Option A: Run All Components (Recommended)**
-```bash
-python run_demo.py
-```
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-**Option B: Run Components Separately**
-```bash
-# Terminal 1: Start detection system
-python src/anomaly_detection.py
+## 📄 License
 
-# Terminal 2: Start dashboard
-streamlit run src/dashboard.py
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-# Terminal 3: Simulate attacks
-python src/data_generator.py --mode attack
-```
+## 🎯 Demo Tips
 
-## 🔍 Detection Capabilities
-
-### Login Anomaly Detection
-- **Suspicious Countries**: Detects logins from high-risk countries
-- **Unusual Hours**: Identifies logins outside normal business hours
-- **New Locations**: Flags first-time logins from new countries
-- **Risk Scoring**: Calculates risk based on multiple factors
-
-### Network Traffic Monitoring
-- **Traffic Spikes**: Detects DDoS-like traffic increases (100x normal)
-- **Baseline Learning**: Continuously updates normal traffic patterns
-- **Threshold Detection**: Alerts on significant deviations from baseline
-
-### File Transfer Analysis
-- **Large Files**: Identifies suspiciously large file transfers
-- **Sensitive Types**: Flags transfers of sensitive file types (.zip, .sql, etc.)
-- **User Patterns**: Learns individual user transfer patterns
-- **Data Exfiltration**: Detects potential data theft attempts
-
-## 🎯 Attack Scenarios
-
-### 1. Coordinated Multi-Vector Attack
-```
-Phase 1: Reconnaissance (normal network traffic)
-Phase 2: Initial Breach (suspicious login)
-Phase 3: Data Exfiltration (large file transfers)
-Phase 4: Cover Tracks (additional suspicious logins)
-```
-
-### 2. DDoS Attack Simulation
-- Rapid burst of network traffic (100x normal volume)
-- Multiple endpoints targeted simultaneously
-- Traffic spike detection triggers immediate alerts
-
-### 3. Insider Threat Scenario
-- Normal login from familiar location
-- Gradual escalation of file transfer activities
-- Suspicious data access patterns
-
-## 📊 Dashboard Features
-
-### Real-Time Metrics
-- **Total Events**: Count of all processed events
-- **Anomalies Detected**: Number of alerts generated
-- **Risk Score**: Current overall risk level (0-1)
-- **System Uptime**: How long the system has been running
-
-### Visualizations
-- **Risk Gauge**: Color-coded risk level indicator
-- **Alert Timeline**: Chronological view of detected anomalies
-- **Event Distribution**: Pie chart showing alert types
-- **Risk Trends**: Rolling average risk score over time
-
-### Interactive Controls
-- **Auto Refresh**: Configurable refresh intervals
-- **Alert Filters**: Filter by risk score thresholds
-- **Demo Controls**: Simulate attacks and clear alerts
-- **System Status**: Real-time system health indicators
-
-## ⚙️ Configuration
-
-The system uses `config/config.yaml` for settings:
-
-```yaml
-detection:
-  login:
-    risk_threshold: 0.6
-    suspicious_countries: ["Russia", "China", "North Korea", "Iran"]
-    unusual_hours: [0, 1, 2, 3, 4, 5, 23]
-  
-  network:
-    risk_threshold: 0.7
-    traffic_baseline: 1000
-    spike_multiplier: 100
-  
-  file_transfer:
-    risk_threshold: 0.6
-    large_file_threshold: 100
-    sensitive_extensions: [".zip", ".rar", ".7z", ".sql", ".db", ".csv"]
-```
-
-## 🎮 Demo Commands
-
-### Run Specific Attack Scenarios
-```bash
-# Coordinated attack
-python src/data_generator.py --scenario coordinated
-
-# DDoS attack
-python src/data_generator.py --scenario ddos
-
-# Insider threat
-python src/data_generator.py --scenario insider
-```
-
-### Continuous Event Generation
-```bash
-# Normal traffic (5 minutes)
-python src/data_generator.py --mode normal --duration 5
-
-# Mixed traffic with occasional attacks
-python src/data_generator.py --mode attack --duration 10
-```
-
-## 🔧 Technical Details
-
-### Event Processing Flow
-1. **Event Reception**: Events arrive via data generator or external sources
-2. **Type Classification**: System identifies event type (login, network, file_transfer)
-3. **Detector Selection**: Appropriate detector processes the event
-4. **Risk Calculation**: Detector calculates risk score based on patterns
-5. **Alert Generation**: High-risk events generate alerts with explanations
-6. **Dashboard Update**: Real-time dashboard reflects new alerts and metrics
-
-### Risk Scoring Algorithm
-- **Login Events**: Country risk (0.4) + Time risk (0.3) + Location risk (0.3)
-- **Network Events**: Traffic spike detection with exponential scaling
-- **File Transfer**: Size risk (0.4) + Type risk (0.3) + Pattern risk (0.3)
-
-### Performance Characteristics
-- **Latency**: < 100ms from event to alert
-- **Throughput**: Handles 1000+ events/second
-- **Memory**: Efficient baseline storage with rolling windows
-- **Scalability**: Modular design allows easy addition of new detectors
-
-## 🚀 Production Deployment
-
-### Scaling Options
-- **Message Queues**: Replace direct event processing with Kafka/RabbitMQ
-- **Database Integration**: Store alerts and metrics in PostgreSQL/MongoDB
-- **API Endpoints**: Expose detection capabilities via REST/GraphQL APIs
-- **Container Deployment**: Docker containers for easy scaling
-
-### Integration Possibilities
-- **SIEM Systems**: Export alerts to Splunk, ELK Stack, or QRadar
-- **ML Models**: Integrate with scikit-learn or TensorFlow for advanced detection
-- **Cloud Services**: Deploy on AWS, Azure, or GCP with managed services
-- **Monitoring**: Add Prometheus/Grafana for system monitoring
-
-## 🎉 Demo Tips
-
-### For Hackathon Presentations
+### For Presentations
 1. **Start Clean**: Begin with normal traffic to show baseline
 2. **Build Suspense**: Gradually introduce suspicious activities
 3. **Show Impact**: Trigger coordinated attacks to demonstrate detection
 4. **Highlight Speed**: Emphasize real-time processing capabilities
 5. **Explain Value**: Connect technical features to business benefits
-
-### Best Practices
-- **Test Scenarios**: Practice attack scenarios before presentation
-- **Backup Plans**: Have alternative demos ready if technical issues arise
-- **Clear Explanations**: Prepare simple explanations for complex concepts
-- **Visual Impact**: Use the dashboard to show real-time updates
-- **Engagement**: Ask audience to suggest attack scenarios
-
-## 🤝 Contributing
-
-This project is designed for learning and demonstration. Contributions welcome:
-
-- **New Detectors**: Add detection algorithms for other threat types
-- **Enhanced Visualizations**: Improve dashboard with new charts and metrics
-- **Attack Scenarios**: Create additional realistic attack simulations
-- **Performance Optimization**: Improve processing speed and efficiency
-- **Documentation**: Enhance setup guides and technical documentation
-
-## 📄 License
-
-This project is open source and available under the MIT License.
 
 ---
 
