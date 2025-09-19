@@ -324,7 +324,11 @@ async def serve_react_app(full_path: str):
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
-    # Serve index.html for all other routes (React Router)
+    # In development mode, redirect to frontend dev server
+    if not os.path.exists("frontend/build/index.html"):
+        return {"message": "Frontend is running in development mode. Please access http://localhost:3000"}
+    
+    # Serve index.html for all other routes (React Router) - production mode
     return FileResponse("frontend/build/index.html")
 
 if __name__ == "__main__":
