@@ -8,8 +8,11 @@ A production-ready cybersecurity anomaly detection system with a modern web dash
 - **🎨 Modern Dashboard**: Beautiful React-based UI with real-time updates
 - **📊 Advanced Analytics**: Interactive charts and threat intelligence
 - **🚨 Smart Alerting**: AI-powered risk scoring and alert management
+- **🧠 Knowledge Base**: RAG-powered context for enhanced LLM explanations
+- **🔒 Privacy-First**: Automatic PII masking and data protection
 - **🌐 REST API**: Complete FastAPI backend with WebSocket support
 - **📱 Responsive Design**: Works on desktop, tablet, and mobile devices
+- **🔍 Vector Search**: Optional semantic similarity search for anomaly patterns
 
 ## 🏗️ Architecture
 
@@ -107,6 +110,27 @@ python data_generator.py --mode stream --anomaly-rate 0.1
 - **🔧 Backend API**: http://localhost:8000
 - **📚 API Documentation**: http://localhost:8000/docs
 - **🔌 WebSocket**: ws://localhost:8000/ws
+
+## 🐧 Ubuntu/Linux Users
+
+For detailed Ubuntu setup instructions, see [UBUNTU_SETUP.md](UBUNTU_SETUP.md)
+
+### Quick Ubuntu Commands:
+```bash
+# Install system dependencies
+sudo apt update && sudo apt install python3 python3-pip python3-venv nodejs npm curl -y
+
+# Clone and setup
+git clone <your-repo-url>
+cd anomaly-detection-system
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cd frontend && npm install && cd ..
+
+# Run the system
+python start_hackathon_demo.py
+```
 
 ## 📦 Dependencies
 
@@ -244,6 +268,14 @@ python data_generator.py --mode stream --anomaly-rate 0.3
 - Suspicious file types and patterns
 - User behavior profiling
 - Data exfiltration attempts
+
+### Knowledge Base & RAG
+- **User Behavior Learning**: Tracks normal patterns (login times, locations, file sizes)
+- **Anomaly History**: Stores and indexes past anomalies for pattern recognition
+- **RAG Context**: Provides historical context to LLM for smarter explanations
+- **Privacy Protection**: Automatic masking of usernames, IPs, and sensitive data
+- **Vector Search**: Optional semantic similarity search for related anomalies
+- **Bounded Memory**: Efficient storage with automatic cleanup (20 logins, 10 files, 500 anomalies)
 
 ## 🚨 Troubleshooting
 

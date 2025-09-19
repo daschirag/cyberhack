@@ -1,5 +1,5 @@
 # CyberShield - Real-Time Cybersecurity Anomaly Detection System
-# Core Dependencies
+# Complete Dependencies for Full System
 
 # Core Framework
 pathway>=0.12.0
@@ -19,17 +19,24 @@ pydantic>=2.5.0
 # Environment and Configuration
 python-dotenv>=1.0.0
 
-# AI and Machine Learning (Optional)
+# AI and Machine Learning
 openai>=1.0.0
 
 # Dashboard and Visualization
 streamlit>=1.28.0
 plotly>=5.17.0
 
+# Knowledge Base and Vector Database (Optional)
+chromadb>=0.4.0
+# pinecone-client>=2.2.0  # Uncomment for Pinecone support
+
 # Development and Testing
 pytest>=7.4.0
 black>=23.0.0
 flake8>=6.0.0
+
+# HTTP Requests (for webhooks and API calls)
+requests>=2.31.0
 
 # Optional: For production deployment
 # kafka-python>=2.0.0  # Uncomment for Kafka integration
