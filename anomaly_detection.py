@@ -80,6 +80,16 @@ class Config:
     USE_KNN_DETECTION = os.getenv("USE_KNN_DETECTION", "false").lower() == "true"
     KNN_NEIGHBORS = 5
     ANOMALY_THRESHOLD = 2.0  # Standard deviations from mean
+    
+    # Knowledge Base Configuration
+    KB_ENABLE_RAG = os.getenv("KB_ENABLE_RAG", "true").lower() == "true"
+    KB_CONTEXT_MAX_ITEMS = int(os.getenv("KB_CONTEXT_MAX_ITEMS", "5"))
+    KB_PII_EXPORT = os.getenv("KB_PII_EXPORT", "false").lower() == "true"
+    
+    # Vector Database Configuration
+    VECTOR_DB_BACKEND = os.getenv("VECTOR_DB_BACKEND", "chroma")  # chroma, pinecone, or none
+    VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "")
+    VECTOR_COLLECTION = os.getenv("VECTOR_COLLECTION", "anomalies")
 
 # ==================== State Management ====================
 class StateManager:
@@ -347,7 +357,7 @@ class LoginAnomalyDetector:
                 if not self.rate_limiter.should_alert(alert_key, severity):
                     return None  # Throttled
                 
-                return {
+                result = {
                     'username': username,
                     'location': location,
                     'timestamp': timestamp,
@@ -356,6 +366,22 @@ class LoginAnomalyDetector:
                     'risk_score': risk_score,
                     'severity': severity
                 }
+                
+                # Update Knowledge Base
+                try:
+                    from pathway_kb import KB_INSTANCE
+                    # Upsert user event
+                    KB_INSTANCE.upsert_user_event(username, {
+                        'location': location,
+                        'timestamp': timestamp,
+                        'ip_address': ip_address
+                    })
+                    # Upsert anomaly
+                    KB_INSTANCE.upsert_anomaly(result)
+                except Exception as kb_error:
+                    logger.warning(f"KB update failed: {kb_error}")
+                
+                return result
                 
         except Exception as e:
             logger.error(f"Error in login anomaly detection: {e}")
@@ -439,7 +465,7 @@ class NetworkAnomalyDetector:
                 if not self.rate_limiter.should_alert(alert_key, severity):
                     return None
                 
-                return {
+                result = {
                     'timestamp': timestamp,
                     'requests_per_minute': requests_per_minute,
                     'baseline': baseline,
@@ -452,6 +478,16 @@ class NetworkAnomalyDetector:
                     'confidence': confidence,
                     'details': f"Traffic {spike_ratio:.1f}x baseline, Z-score: {z_score:.2f}"
                 }
+                
+                # Update Knowledge Base
+                try:
+                    from pathway_kb import KB_INSTANCE
+                    # Upsert anomaly (network anomalies don't have user context)
+                    KB_INSTANCE.upsert_anomaly(result)
+                except Exception as kb_error:
+                    logger.warning(f"KB update failed: {kb_error}")
+                
+                return result
                 
         except Exception as e:
             logger.error(f"Error in network anomaly detection: {e}")
@@ -569,7 +605,7 @@ class FileTransferAnomalyDetector:
                 if not self.rate_limiter.should_alert(alert_key, severity):
                     return None
                 
-                return {
+                result = {
                     'username': username,
                     'timestamp': timestamp,
                     'file_size_mb': file_size_mb,
@@ -580,6 +616,23 @@ class FileTransferAnomalyDetector:
                     'severity': severity,
                     'historical_avg': pattern['avg_size']
                 }
+                
+                # Update Knowledge Base
+                try:
+                    from pathway_kb import KB_INSTANCE
+                    # Upsert user event
+                    KB_INSTANCE.upsert_user_event(username, {
+                        'file_size_mb': file_size_mb,
+                        'filename': filename,
+                        'operation': operation,
+                        'timestamp': timestamp
+                    })
+                    # Upsert anomaly
+                    KB_INSTANCE.upsert_anomaly(result)
+                except Exception as kb_error:
+                    logger.warning(f"KB update failed: {kb_error}")
+                
+                return result
                 
         except Exception as e:
             logger.error(f"Error in file transfer anomaly detection: {e}")
@@ -619,23 +672,129 @@ class AlertSystem:
         return sanitized
     
     def generate_llm_explanation(self, anomaly: Dict) -> str:
-        """Generate explanation with privacy protection"""
+        """Generate explanation with privacy protection and RAG context"""
         if not Config.USE_LLM or not anomaly:
             return self._generate_template_explanation(anomaly)
+        
+        # Get RAG context if enabled
+        rag_context = ""
+        if Config.KB_ENABLE_RAG:
+            try:
+                from pathway_kb import KB_INSTANCE
+                context = KB_INSTANCE.get_context_for_anomaly(anomaly, max_items=Config.KB_CONTEXT_MAX_ITEMS)
+                rag_context = self._build_rag_context_string(context)
+            except Exception as e:
+                logger.warning(f"RAG context retrieval failed: {e}")
         
         # Prefer local LLM for privacy
         if Config.PREFER_LOCAL_LLM:
             try:
-                return self._ollama_explain(anomaly)
+                return self._ollama_explain(anomaly, rag_context)
             except:
                 pass
         
-        # Use OpenAI with sanitized data
+        # Use OpenAI with sanitized data and RAG context
         if Config.OPENAI_API_KEY and OPENAI_AVAILABLE:
             sanitized = self.sanitize_for_llm(anomaly)
-            return self._openai_explain(sanitized)
+            return self._openai_explain(sanitized, rag_context)
         
         return self._generate_template_explanation(anomaly)
+    
+    def _build_rag_context_string(self, context: Dict) -> str:
+        """Build compact RAG context string for LLM"""
+        try:
+            if not context or context.get('error'):
+                return ""
+            
+            parts = []
+            
+            # User context
+            if context.get('masked_username') and context['masked_username'] != 'unknown':
+                parts.append(f"User {context['masked_username']}")
+            
+            # Recent logins
+            if context.get('last_logins'):
+                login_parts = []
+                for login in context['last_logins'][:3]:  # Max 3 recent logins
+                    location = login.get('location', 'unknown')
+                    timestamp = login.get('timestamp', '')
+                    if timestamp:
+                        try:
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            time_str = dt.strftime('%m-%d %H:%M')
+                        except:
+                            time_str = 'recent'
+                    else:
+                        time_str = 'recent'
+                    login_parts.append(f"{location}@{time_str}")
+                
+                if login_parts:
+                    parts.append(f"last_logins: [{', '.join(login_parts)}]")
+            
+            # Normal hours
+            if context.get('normal_hours'):
+                hours = context['normal_hours']
+                if hours:
+                    start_hour = min(hours)
+                    end_hour = max(hours)
+                    parts.append(f"normal_hours: {start_hour:02d}-{end_hour:02d}")
+            
+            # File summary
+            if context.get('file_summary') and context['file_summary'].get('total_transfers', 0) > 0:
+                fs = context['file_summary']
+                parts.append(f"file_summary: {fs['total_transfers']} transfers, avg {fs['avg_size_mb']:.1f}MB")
+            
+            # Recent related anomalies
+            if context.get('recent_related_anomalies'):
+                related_parts = []
+                for anomaly in context['recent_related_anomalies'][:2]:  # Max 2 related
+                    anomaly_type = anomaly.get('type', 'unknown')
+                    timestamp = anomaly.get('timestamp', '')
+                    if timestamp:
+                        try:
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                            date_str = dt.strftime('%m-%d')
+                        except:
+                            date_str = 'recent'
+                    else:
+                        date_str = 'recent'
+                    
+                    if anomaly_type == 'file_transfer':
+                        related_parts.append(f"Large file {date_str}")
+                    elif anomaly_type == 'login':
+                        related_parts.append(f"login-new-ip {date_str}")
+                    else:
+                        related_parts.append(f"{anomaly_type} {date_str}")
+                
+                if related_parts:
+                    parts.append(f"recent_related: [{', '.join(related_parts)}]")
+            
+            # Similar anomalies
+            if context.get('similar_anomalies'):
+                similar_parts = []
+                for similar in context['similar_anomalies'][:2]:  # Max 2 similar
+                    summary = similar.get('summary', '')
+                    if summary:
+                        # Truncate long summaries
+                        if len(summary) > 30:
+                            summary = summary[:27] + "..."
+                        similar_parts.append(summary)
+                
+                if similar_parts:
+                    parts.append(f"Similar: {', '.join(similar_parts)}")
+            
+            if parts:
+                context_str = "CONTEXT (redacted): " + "; ".join(parts)
+                # Ensure it's under 250 tokens (roughly 200 characters)
+                if len(context_str) > 200:
+                    context_str = context_str[:197] + "..."
+                return context_str
+            
+            return ""
+            
+        except Exception as e:
+            logger.error(f"Error building RAG context: {e}")
+            return ""
     
     def _generate_template_explanation(self, anomaly: Dict) -> str:
         """Generate template-based explanation"""
@@ -660,8 +819,8 @@ class AlertSystem:
         
         return "⚠️ Security anomaly detected"
     
-    def _openai_explain(self, anomaly: Dict) -> str:
-        """Generate explanation using OpenAI (with sanitized data)"""
+    def _openai_explain(self, anomaly: Dict, rag_context: str = "") -> str:
+        """Generate explanation using OpenAI (with sanitized data and RAG context)"""
         if not OPENAI_AVAILABLE:
             return self._generate_template_explanation(anomaly)
         
@@ -671,10 +830,15 @@ class AlertSystem:
             # Create context based on anomaly type
             context = json.dumps(anomaly, default=str)
             
+            # Build system message with RAG context
+            system_content = "You are a security analyst. Generate a brief, actionable alert message (max 50 words). Do not mention specific usernames or IPs."
+            if rag_context:
+                system_content += f"\n\n{rag_context}"
+            
             response = openai.ChatCompletion.create(
                 model=Config.OPENAI_MODEL,
                 messages=[
-                    {"role": "system", "content": "You are a security analyst. Generate a brief, actionable alert message (max 50 words). Do not mention specific usernames or IPs."},
+                    {"role": "system", "content": system_content},
                     {"role": "user", "content": f"Explain this security anomaly: {context}"}
                 ],
                 temperature=0.3,
@@ -687,17 +851,22 @@ class AlertSystem:
             logger.error(f"OpenAI error: {e}")
             return self._generate_template_explanation(anomaly)
     
-    def _ollama_explain(self, anomaly: Dict) -> str:
+    def _ollama_explain(self, anomaly: Dict, rag_context: str = "") -> str:
         """Use local Ollama for privacy-preserving explanations"""
         try:
             import requests
             sanitized = self.sanitize_for_llm(anomaly)
             
+            # Build prompt with RAG context
+            prompt = f"Security alert (max 30 words): {json.dumps(sanitized)}"
+            if rag_context:
+                prompt = f"{rag_context}\n\n{prompt}"
+            
             response = requests.post(
                 Config.OLLAMA_URL,
                 json={
                     "model": "llama2",
-                    "prompt": f"Security alert (max 30 words): {json.dumps(sanitized)}",
+                    "prompt": prompt,
                     "stream": False
                 },
                 timeout=3

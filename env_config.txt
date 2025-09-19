@@ -20,3 +20,13 @@ DISCORD_WEBHOOK_URL=
 
 # Advanced Features
 USE_KNN_DETECTION=false
+
+# Knowledge Base Configuration
+KB_ENABLE_RAG=true
+KB_CONTEXT_MAX_ITEMS=5
+KB_PII_EXPORT=false
+
+# Vector Database Configuration
+VECTOR_DB_BACKEND=chroma
+VECTOR_DB_URL=
+VECTOR_COLLECTION=anomalies
