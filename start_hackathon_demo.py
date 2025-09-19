@@ -41,32 +41,10 @@ class HackathonDemo:
             return None
     
     def start_frontend(self):
-        """Start the React frontend"""
-        print("🎨 Starting React frontend...")
-        try:
-            frontend_dir = Path("frontend")
-            if not frontend_dir.exists():
-                print("❌ Frontend directory not found!")
-                return None
-                
-            # Check if node_modules exists
-            if not (frontend_dir / "node_modules").exists():
-                print("📦 Installing frontend dependencies...")
-                subprocess.run(["npm", "install"], cwd=frontend_dir, check=True)
-            
-            # Start the frontend in development mode
-            process = subprocess.Popen(
-                ["npm", "start"],
-                cwd=frontend_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                env={**os.environ, "BROWSER": "none"}  # Prevent auto-opening browser
-            )
-            print("✅ Frontend started on http://localhost:3000")
-            return process
-        except Exception as e:
-            print(f"❌ Failed to start frontend: {e}")
-            return None
+        """Frontend is now served by the backend - no separate process needed"""
+        print("🎨 Frontend will be served by backend at http://localhost:8000")
+        print("✅ No separate frontend process needed")
+        return None  # No process to manage
     
     def start_anomaly_detection(self):
         """Start the anomaly detection system"""
@@ -162,7 +140,7 @@ class HackathonDemo:
         
         print("\n🎉 Hackathon Demo is running!")
         print("=" * 50)
-        print("📱 Frontend: http://localhost:3000")
+        print("🌐 Dashboard: http://localhost:8000")
         print("🔧 Backend API: http://localhost:8000")
         print("📊 API Docs: http://localhost:8000/docs")
         print("🛡️ Anomaly Detection: Running")

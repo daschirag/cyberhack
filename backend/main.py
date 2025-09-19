@@ -318,18 +318,19 @@ if os.path.exists("frontend/build/static"):
 else:
     logger.warning("Frontend build directory not found. Static files will not be served.")
 
+@app.get("/")
+async def serve_dashboard():
+    """Serve the main dashboard"""
+    return FileResponse("frontend/index.html")
+
 @app.get("/{full_path:path}")
-async def serve_react_app(full_path: str):
-    """Serve React app for all non-API routes"""
+async def serve_static_files(full_path: str):
+    """Serve static files or redirect to dashboard"""
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
-    # In development mode, redirect to frontend dev server
-    if not os.path.exists("frontend/build/index.html"):
-        return {"message": "Frontend is running in development mode. Please access http://localhost:3000"}
-    
-    # Serve index.html for all other routes (React Router) - production mode
-    return FileResponse("frontend/build/index.html")
+    # For any other route, serve the dashboard
+    return FileResponse("frontend/index.html")
 
 if __name__ == "__main__":
     # Ensure output directory exists
