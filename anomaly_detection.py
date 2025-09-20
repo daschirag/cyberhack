@@ -1,6 +1,7 @@
 """
 Real-Time Cybersecurity Anomaly Detection System using Pathway
 Production-hardened version with fixes for edge cases and scalability
+Integrated with data generator for hackathon demo
 """
 
 import pathway as pw
@@ -61,9 +62,14 @@ class Config:
     ALERT_BATCH_WINDOW = 5  # Seconds to batch similar alerts
     MAX_ALERTS_PER_WINDOW = 10  # Maximum alerts per time window
     
-    # Output configuration - FIXED
+    # Directory configuration - Updated for data generator integration
     OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")
-    INPUT_DIR = os.getenv("INPUT_DIR", "./input")
+    DATA_DIR = os.getenv("DATA_DIR", "./data")
+    
+    # Streaming data directories (created by data generator)
+    LOGIN_STREAM_DIR = os.path.join(DATA_DIR, "login_stream")
+    NETWORK_STREAM_DIR = os.path.join(DATA_DIR, "network_stream")  
+    FILE_STREAM_DIR = os.path.join(DATA_DIR, "file_stream")
     
     # State persistence
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -158,7 +164,7 @@ class StateManager:
         key = f"user:{username}"
         self.set(key, profile, ttl=86400 * 7)  # 7 days TTL
 
-# ==================== Data Schemas - FIXED ====================
+# ==================== Data Schemas ====================
 class LoginSchema(pw.Schema):
     username: str
     location: str
@@ -261,7 +267,7 @@ class AlertRateLimiter:
 STATE_MANAGER = StateManager()
 RATE_LIMITER = AlertRateLimiter()
 
-# ==================== Enhanced Anomaly Detectors - FIXED ====================
+# ==================== Enhanced Anomaly Detectors ====================
 @pw.udf
 def detect_login_anomaly(username: str, location: str, timestamp: str, ip_address: str) -> str:
     """Detect login anomalies with robust parsing and state management"""
@@ -369,6 +375,7 @@ def detect_login_anomaly(username: str, location: str, timestamp: str, ip_addres
                 'type': 'login_anomaly'
             }
             
+            logger.warning(f"LOGIN ANOMALY DETECTED: {username} from {location} (Risk: {risk_score})")
             return json.dumps(result, default=str)
             
     except Exception as e:
@@ -419,6 +426,7 @@ def detect_network_anomaly(timestamp: str, requests_per_minute: int, source_ip: 
                 'details': f"Traffic {spike_ratio:.1f}x baseline"
             }
             
+            logger.warning(f"NETWORK ANOMALY DETECTED: {requests_per_minute} RPM from {source_ip} (Risk: {risk_score})")
             return json.dumps(result, default=str)
             
     except Exception as e:
@@ -501,6 +509,7 @@ def detect_file_anomaly(username: str, timestamp: str, file_size_mb: float,
                 'type': 'file_anomaly'
             }
             
+            logger.warning(f"FILE ANOMALY DETECTED: {username} {operation} {filename} ({file_size_mb}MB - Risk: {risk_score})")
             return json.dumps(result, default=str)
             
     except Exception as e:
@@ -508,80 +517,62 @@ def detect_file_anomaly(username: str, timestamp: str, file_size_mb: float,
     
     return ""
 
-# ==================== Sample Data Generator ====================
-def create_sample_data():
-    """Create sample input data files for testing"""
-    os.makedirs(Config.INPUT_DIR, exist_ok=True)
-    os.makedirs(Config.OUTPUT_DIR, exist_ok=True)
-    
-    # Sample login data
-    login_data = [
-        {"username": "john_doe", "location": "New York", "timestamp": "2025-09-20T14:30:00Z", "ip_address": "192.168.1.100"},
-        {"username": "jane_smith", "location": "Moscow", "timestamp": "2025-09-20T23:45:00Z", "ip_address": "185.220.100.50"},
-        {"username": "bob_wilson", "location": "London", "timestamp": "2025-09-20T09:15:00Z", "ip_address": "10.0.0.50"}
+# ==================== Directory Setup ====================
+def ensure_directories():
+    """Ensure all required directories exist"""
+    directories = [
+        Config.OUTPUT_DIR,
+        Config.DATA_DIR,
+        Config.LOGIN_STREAM_DIR,
+        Config.NETWORK_STREAM_DIR,
+        Config.FILE_STREAM_DIR
     ]
     
-    # Sample network data
-    network_data = [
-        {"timestamp": "2025-09-20T14:30:00Z", "requests_per_minute": 150, "source_ip": "192.168.1.100"},
-        {"timestamp": "2025-09-20T14:31:00Z", "requests_per_minute": 1500, "source_ip": "192.168.1.101"},
-        {"timestamp": "2025-09-20T14:32:00Z", "requests_per_minute": 80, "source_ip": "192.168.1.102"}
-    ]
-    
-    # Sample file transfer data
-    file_data = [
-        {"username": "john_doe", "timestamp": "2025-09-20T14:30:00Z", "file_size_mb": 50.5, "operation": "upload", "filename": "report.pdf"},
-        {"username": "jane_smith", "timestamp": "2025-09-20T14:35:00Z", "file_size_mb": 250.0, "operation": "download", "filename": "database_backup.sql"},
-        {"username": "bob_wilson", "timestamp": "2025-09-20T14:40:00Z", "file_size_mb": 15.2, "operation": "upload", "filename": "document.docx"}
-    ]
-    
-    # Write sample data files
-    with open(os.path.join(Config.INPUT_DIR, "login_data.jsonl"), "w") as f:
-        for item in login_data:
-            f.write(json.dumps(item) + "\n")
-    
-    with open(os.path.join(Config.INPUT_DIR, "network_data.jsonl"), "w") as f:
-        for item in network_data:
-            f.write(json.dumps(item) + "\n")
-    
-    with open(os.path.join(Config.INPUT_DIR, "file_data.jsonl"), "w") as f:
-        for item in file_data:
-            f.write(json.dumps(item) + "\n")
-    
-    logger.info(f"Created sample data files in {Config.INPUT_DIR}")
+    for directory in directories:
+        os.makedirs(directory, exist_ok=True)
+        logger.info(f"Ensured directory exists: {directory}")
 
-# ==================== Main Pipeline - FIXED ====================
+# ==================== Main Pipeline - Updated for Data Generator Integration ====================
 def main():
     """Main function to set up and run the anomaly detection pipeline"""
     
-    # Create sample data for testing
-    create_sample_data()
+    # Ensure all required directories exist
+    ensure_directories()
     
     logger.info("Starting Real-Time Cybersecurity Anomaly Detection System")
-    logger.info(f"Input directory: {Config.INPUT_DIR}")
+    logger.info(f"Watching streaming directories:")
+    logger.info(f"  Login data: {Config.LOGIN_STREAM_DIR}")
+    logger.info(f"  Network data: {Config.NETWORK_STREAM_DIR}")
+    logger.info(f"  File data: {Config.FILE_STREAM_DIR}")
     logger.info(f"Output directory: {Config.OUTPUT_DIR}")
     
     try:
-        # Input connectors - Read from JSONL files
+        # Input connectors - Read from streaming directories created by data generator
+        logger.info("Setting up input connectors for streaming data...")
+        
         login_table = pw.io.jsonlines.read(
-            os.path.join(Config.INPUT_DIR, "login_data.jsonl"),
+            Config.LOGIN_STREAM_DIR,
             schema=LoginSchema,
             mode="streaming"
         )
         
         network_table = pw.io.jsonlines.read(
-            os.path.join(Config.INPUT_DIR, "network_data.jsonl"),
+            Config.NETWORK_STREAM_DIR,
             schema=NetworkTrafficSchema,
             mode="streaming"
         )
         
         file_table = pw.io.jsonlines.read(
-            os.path.join(Config.INPUT_DIR, "file_data.jsonl"),
+            Config.FILE_STREAM_DIR,
             schema=FileTransferSchema,
             mode="streaming"
         )
         
+        logger.info("Input connectors configured successfully")
+        
         # Apply anomaly detection UDFs
+        logger.info("Setting up anomaly detection pipeline...")
+        
         login_anomalies = login_table.select(
             anomaly_data=detect_login_anomaly(
                 login_table.username,
@@ -609,7 +600,11 @@ def main():
             )
         ).filter(pw.this.anomaly_data != "")
         
-        # Output connectors - Write to JSONL files
+        logger.info("Anomaly detection UDFs configured")
+        
+        # Output connectors - Write to JSONL files for backend consumption
+        logger.info("Setting up output connectors...")
+        
         pw.io.jsonlines.write(
             login_anomalies,
             os.path.join(Config.OUTPUT_DIR, "login_anomalies.jsonl")
@@ -625,12 +620,20 @@ def main():
             os.path.join(Config.OUTPUT_DIR, "file_anomalies.jsonl")
         )
         
-        logger.info("Pipeline configured successfully")
-        logger.info("Starting streaming computation...")
+        logger.info("Output connectors configured successfully")
+        logger.info("=" * 60)
+        logger.info("🛡️  CYBERSHIELD ANOMALY DETECTION SYSTEM READY")
+        logger.info("=" * 60)
+        logger.info("Waiting for data from the data generator...")
+        logger.info("System will detect and log anomalies in real-time")
+        logger.info("Press Ctrl+C to stop")
+        logger.info("=" * 60)
         
-        # Run the pipeline
+        # Run the pipeline - This will block and process streaming data
         pw.run()
         
+    except KeyboardInterrupt:
+        logger.info("System stopped by user")
     except Exception as e:
         logger.error(f"Pipeline error: {e}")
         raise
