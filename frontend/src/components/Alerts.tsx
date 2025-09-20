@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { useAnomalies } from '../context/AnomalyContext';
 import { format } from 'date-fns';
-import { AlertTriangle, Shield, FileText, Network, Filter, Search } from 'lucide-react';
+import { AlertTriangle, Shield, FileText, Network, Filter, Search, LucideIcon } from 'lucide-react';
+import { Anomaly } from '../types';
 
-const Alerts = () => {
+const Alerts: React.FC = () => {
   const { anomalies, handleAlertAction } = useAnomalies();
-  const [filter, setFilter] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const filteredAnomalies = anomalies.filter(anomaly => {
+  const filteredAnomalies = anomalies.filter((anomaly: Anomaly) => {
     const matchesFilter = filter === 'all' || anomaly.severity === filter.toUpperCase();
     const matchesSearch = anomaly.explanation?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          anomaly.type?.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case 'CRITICAL':
         return 'text-red-400 bg-red-500/10 border-red-500/20';
@@ -28,7 +29,7 @@ const Alerts = () => {
     }
   };
 
-  const getTypeIcon = (type) => {
+  const getTypeIcon = (type: string): React.ReactElement => {
     switch (type) {
       case 'login':
         return <Shield size={20} className="text-blue-400" />;
@@ -41,7 +42,7 @@ const Alerts = () => {
     }
   };
 
-  const handleAction = async (anomalyId, action) => {
+  const handleAction = async (anomalyId: string, action: string): Promise<void> => {
     await handleAlertAction(anomalyId, action);
   };
 
@@ -95,7 +96,7 @@ const Alerts = () => {
             <p className="text-slate-400">No security alerts match your current filters.</p>
           </div>
         ) : (
-          filteredAnomalies.map((anomaly, index) => (
+          filteredAnomalies.map((anomaly: Anomaly, index: number) => (
             <div key={index} className="bg-slate-800 rounded-lg border border-slate-700 p-6 hover:border-slate-600 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4">

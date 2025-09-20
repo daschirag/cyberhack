@@ -1,8 +1,15 @@
 import React from 'react';
 import { AlertTriangle, Shield, CheckCircle } from 'lucide-react';
+import { ThreatLevelProps } from '../../types';
 
-const ThreatLevel = ({ stats }) => {
-  const getThreatLevel = () => {
+interface ThreatLevelInfo {
+  level: string;
+  color: string;
+  bgColor: string;
+}
+
+const ThreatLevel: React.FC<ThreatLevelProps> = ({ stats }) => {
+  const getThreatLevel = (): ThreatLevelInfo => {
     const critical = stats.critical_count;
     const high = stats.high_count;
     
@@ -14,7 +21,7 @@ const ThreatLevel = ({ stats }) => {
 
   const threat = getThreatLevel();
 
-  const getIcon = () => {
+  const getIcon = (): React.ReactElement => {
     switch (threat.level) {
       case 'CRITICAL':
         return <AlertTriangle className="text-red-500" size={32} />;
@@ -24,6 +31,51 @@ const ThreatLevel = ({ stats }) => {
         return <Shield className="text-yellow-500" size={32} />;
       default:
         return <CheckCircle className="text-green-500" size={32} />;
+    }
+  };
+
+  const getThreatDescription = (): string => {
+    switch (threat.level) {
+      case 'CRITICAL':
+        return 'Immediate action required. Critical threats detected.';
+      case 'HIGH':
+        return 'High priority threats require attention.';
+      case 'MEDIUM':
+        return 'Moderate security concerns detected.';
+      case 'LOW':
+        return 'System operating within normal parameters.';
+      default:
+        return 'System operating within normal parameters.';
+    }
+  };
+
+  const getProgressWidth = (): string => {
+    switch (threat.level) {
+      case 'CRITICAL':
+        return '100%';
+      case 'HIGH':
+        return '75%';
+      case 'MEDIUM':
+        return '50%';
+      case 'LOW':
+        return '25%';
+      default:
+        return '25%';
+    }
+  };
+
+  const getProgressColor = (): string => {
+    switch (threat.level) {
+      case 'CRITICAL':
+        return 'bg-red-500';
+      case 'HIGH':
+        return 'bg-orange-500';
+      case 'MEDIUM':
+        return 'bg-yellow-500';
+      case 'LOW':
+        return 'bg-green-500';
+      default:
+        return 'bg-green-500';
     }
   };
 
@@ -49,25 +101,14 @@ const ThreatLevel = ({ stats }) => {
             </div>
             <div className="w-full bg-slate-700 rounded-full h-2">
               <div 
-                className={`h-2 rounded-full transition-all duration-500 ${
-                  threat.level === 'CRITICAL' ? 'bg-red-500' :
-                  threat.level === 'HIGH' ? 'bg-orange-500' :
-                  threat.level === 'MEDIUM' ? 'bg-yellow-500' : 'bg-green-500'
-                }`}
-                style={{
-                  width: threat.level === 'CRITICAL' ? '100%' :
-                         threat.level === 'HIGH' ? '75%' :
-                         threat.level === 'MEDIUM' ? '50%' : '25%'
-                }}
+                className={`h-2 rounded-full transition-all duration-500 ${getProgressColor()}`}
+                style={{ width: getProgressWidth() }}
               ></div>
             </div>
           </div>
           
           <div className="text-sm text-slate-300">
-            {threat.level === 'CRITICAL' && 'Immediate action required. Critical threats detected.'}
-            {threat.level === 'HIGH' && 'High priority threats require attention.'}
-            {threat.level === 'MEDIUM' && 'Moderate security concerns detected.'}
-            {threat.level === 'LOW' && 'System operating within normal parameters.'}
+            {getThreatDescription()}
           </div>
         </div>
       </div>

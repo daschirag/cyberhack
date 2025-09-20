@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAnomalies } from '../context/AnomalyContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { ChartData, TimeSeriesData } from '../types';
 
-const Analytics = () => {
+const Analytics: React.FC = () => {
   const { getAnomalyTypes, getSeverityBreakdown, anomalies } = useAnomalies();
-  const [anomalyTypes, setAnomalyTypes] = useState({});
-  const [severityBreakdown, setSeverityBreakdown] = useState({});
-  const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const [anomalyTypes, setAnomalyTypes] = useState<Record<string, number>>({});
+  const [severityBreakdown, setSeverityBreakdown] = useState<Record<string, number>>({});
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchData = async (): Promise<void> => {
       const [types, severity] = await Promise.all([
         getAnomalyTypes(),
         getSeverityBreakdown()
@@ -23,13 +24,13 @@ const Analytics = () => {
 
   useEffect(() => {
     // Generate time series data from anomalies
-    const hourlyData = {};
+    const hourlyData: Record<number, number> = {};
     anomalies.forEach(anomaly => {
       const hour = new Date(anomaly.timestamp).getHours();
       hourlyData[hour] = (hourlyData[hour] || 0) + 1;
     });
 
-    const timeData = Array.from({ length: 24 }, (_, i) => ({
+    const timeData: TimeSeriesData[] = Array.from({ length: 24 }, (_, i) => ({
       hour: `${i}:00`,
       count: hourlyData[i] || 0
     }));
@@ -39,12 +40,12 @@ const Analytics = () => {
 
   const COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6'];
 
-  const anomalyTypeData = Object.entries(anomalyTypes).map(([type, count]) => ({
+  const anomalyTypeData: ChartData[] = Object.entries(anomalyTypes).map(([type, count]) => ({
     name: type.replace('_', ' ').toUpperCase(),
     value: count
   }));
 
-  const severityData = Object.entries(severityBreakdown).map(([severity, count]) => ({
+  const severityData: ChartData[] = Object.entries(severityBreakdown).map(([severity, count]) => ({
     name: severity,
     value: count
   }));

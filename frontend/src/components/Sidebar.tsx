@@ -6,11 +6,19 @@ import {
   BarChart3, 
   Settings, 
   Shield,
-  X
+  X,
+  LucideIcon
 } from 'lucide-react';
+import { SidebarProps } from '../types';
 
-const Sidebar = ({ isOpen, setIsOpen }) => {
-  const navigation = [
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, setIsOpen }) => {
+  const navigation: NavigationItem[] = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },

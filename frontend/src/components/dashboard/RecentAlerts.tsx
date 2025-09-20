@@ -1,9 +1,10 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { AlertTriangle, Shield, FileText, Network } from 'lucide-react';
+import { RecentAlertsProps, Anomaly } from '../../types';
 
-const RecentAlerts = ({ anomalies }) => {
-  const getSeverityColor = (severity) => {
+const RecentAlerts: React.FC<RecentAlertsProps> = ({ anomalies }) => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case 'CRITICAL':
         return 'text-red-400 bg-red-500/10 border-red-500/20';
@@ -16,7 +17,7 @@ const RecentAlerts = ({ anomalies }) => {
     }
   };
 
-  const getTypeIcon = (type) => {
+  const getTypeIcon = (type: string): React.ReactElement => {
     switch (type) {
       case 'login':
         return <Shield size={16} className="text-blue-400" />;
@@ -29,7 +30,7 @@ const RecentAlerts = ({ anomalies }) => {
     }
   };
 
-  const getTypeLabel = (type) => {
+  const getTypeLabel = (type: string): string => {
     switch (type) {
       case 'login':
         return 'Login Anomaly';
@@ -57,7 +58,7 @@ const RecentAlerts = ({ anomalies }) => {
             <p className="text-sm">System is operating normally</p>
           </div>
         ) : (
-          anomalies.map((anomaly, index) => (
+          anomalies.map((anomaly: Anomaly, index: number) => (
             <div key={index} className="p-4 hover:bg-slate-700/50 transition-colors">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-3">

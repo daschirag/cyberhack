@@ -46,7 +46,12 @@
   },
   "devDependencies": {
     "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0"
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0",
+    "@types/bun": "latest"
   },
-  "proxy": "http://localhost:8000"
+  "proxy": "http://localhost:8000",
+  "module": "src/index.tsx",
+  "type": "module"
 }

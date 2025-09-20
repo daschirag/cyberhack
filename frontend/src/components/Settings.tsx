@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Shield, Bell, Database, Key, Save } from 'lucide-react';
+import { AppSettings } from '../types';
 
-const Settings = () => {
-  const [settings, setSettings] = useState({
+const Settings: React.FC = () => {
+  const [settings, setSettings] = useState<AppSettings>({
     notifications: {
       email: true,
       slack: false,
@@ -21,7 +22,7 @@ const Settings = () => {
     }
   });
 
-  const handleSave = () => {
+  const handleSave = (): void => {
     // In a real app, this would save to backend
     console.log('Settings saved:', settings);
   };
@@ -106,7 +107,7 @@ const Settings = () => {
                 value={settings.detection.sensitivity}
                 onChange={(e) => setSettings({
                   ...settings,
-                  detection: { ...settings.detection, sensitivity: e.target.value }
+                  detection: { ...settings.detection, sensitivity: e.target.value as 'low' | 'medium' | 'high' }
                 })}
                 className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
               >

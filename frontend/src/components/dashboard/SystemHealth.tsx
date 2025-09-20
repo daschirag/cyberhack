@@ -1,8 +1,17 @@
 import React from 'react';
-import { Activity, Cpu, HardDrive, Wifi } from 'lucide-react';
+import { Activity, Cpu, HardDrive, Wifi, LucideIcon } from 'lucide-react';
+import { SystemHealthProps } from '../../types';
 
-const SystemHealth = ({ stats }) => {
-  const healthMetrics = [
+interface HealthMetric {
+  name: string;
+  value: string;
+  status: 'good' | 'warning' | 'critical';
+  icon: LucideIcon;
+  color: string;
+}
+
+const SystemHealth: React.FC<SystemHealthProps> = ({ stats }) => {
+  const healthMetrics: HealthMetric[] = [
     {
       name: 'CPU Usage',
       value: '23%',
@@ -33,7 +42,7 @@ const SystemHealth = ({ stats }) => {
     },
   ];
 
-  const getStatusColor = (status) => {
+  const getStatusColor = (status: string): string => {
     switch (status) {
       case 'good':
         return 'bg-green-500';

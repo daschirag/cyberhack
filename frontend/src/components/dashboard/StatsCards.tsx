@@ -1,8 +1,18 @@
 import React from 'react';
-import { AlertTriangle, Shield, Activity, Clock } from 'lucide-react';
+import { AlertTriangle, Shield, Activity, Clock, LucideIcon } from 'lucide-react';
+import { StatsCardsProps } from '../../types';
 
-const StatsCards = ({ stats }) => {
-  const cards = [
+interface StatCard {
+  title: string;
+  value: string | number;
+  icon: LucideIcon;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+}
+
+const StatsCards: React.FC<StatsCardsProps> = ({ stats }) => {
+  const cards: StatCard[] = [
     {
       title: 'Total Anomalies',
       value: stats.total_anomalies,

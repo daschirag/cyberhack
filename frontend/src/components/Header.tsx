@@ -1,7 +1,8 @@
 import React from 'react';
-import { Menu, Bell, Shield, Wifi, WifiOff } from 'lucide-react';
+import { Menu, Bell, Shield, Wifi } from 'lucide-react';
+import { HeaderProps } from '../types';
 
-const Header = ({ onMenuClick }) => {
+const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
   return (
     <header className="bg-slate-800 border-b border-slate-700 px-4 py-3">
       <div className="flex items-center justify-between">

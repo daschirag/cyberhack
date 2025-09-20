@@ -6,7 +6,7 @@ import ThreatLevel from './dashboard/ThreatLevel';
 import SystemHealth from './dashboard/SystemHealth';
 import ActivityTimeline from './dashboard/ActivityTimeline';
 
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
   const { stats, anomalies, loading } = useAnomalies();
 
   if (loading) {

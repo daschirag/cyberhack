@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Dashboard from './components/Dashboard';
@@ -10,8 +10,8 @@ import Header from './components/Header';
 import { AnomalyProvider } from './context/AnomalyContext';
 import './index.css';
 
-function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+const App: React.FC = () => {
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
   return (
     <AnomalyProvider>
@@ -59,6 +59,6 @@ function App() {
       </Router>
     </AnomalyProvider>
   );
-}
+};
 
 export default App;

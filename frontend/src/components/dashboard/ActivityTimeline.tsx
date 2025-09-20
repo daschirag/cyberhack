@@ -1,9 +1,10 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { AlertTriangle, Shield, FileText, Network } from 'lucide-react';
+import { ActivityTimelineProps, Anomaly } from '../../types';
 
-const ActivityTimeline = ({ anomalies }) => {
-  const getTypeIcon = (type) => {
+const ActivityTimeline: React.FC<ActivityTimelineProps> = ({ anomalies }) => {
+  const getTypeIcon = (type: string): React.ReactElement => {
     switch (type) {
       case 'login':
         return <Shield size={16} className="text-blue-400" />;
@@ -16,7 +17,7 @@ const ActivityTimeline = ({ anomalies }) => {
     }
   };
 
-  const getSeverityColor = (severity) => {
+  const getSeverityColor = (severity: string): string => {
     switch (severity) {
       case 'CRITICAL':
         return 'bg-red-500';
@@ -40,7 +41,7 @@ const ActivityTimeline = ({ anomalies }) => {
             <p className="text-sm">No recent activity</p>
           </div>
         ) : (
-          anomalies.map((anomaly, index) => (
+          anomalies.map((anomaly: Anomaly, index: number) => (
             <div key={index} className="flex items-start space-x-3">
               <div className="flex-shrink-0">
                 <div className={`w-3 h-3 rounded-full ${getSeverityColor(anomaly.severity)}`}></div>
