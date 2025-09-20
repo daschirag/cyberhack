@@ -380,7 +380,7 @@ async def websocket_endpoint(websocket: WebSocket):
     try:
         while True:
             # Keep connection alive and send periodic updates
-            await asyncio.sleep(30)  # Send update every 30 seconds
+            await asyncio.sleep(1)  # Send update every 30 seconds
             stats = calculate_system_stats()
             await websocket.send_json({
                 "type": "stats_update",
@@ -411,11 +411,11 @@ async def monitor_anomalies():
                 
                 last_anomaly_count = current_count
             
-            await asyncio.sleep(5)  # Check every 5 seconds
+            await asyncio.sleep(1)  # Check every 5 seconds
             
         except Exception as e:
             logger.error(f"Error in anomaly monitoring: {e}")
-            await asyncio.sleep(10)
+            await asyncio.sleep(1)
 
 # Lifespan handler is defined above with the FastAPI app
 
