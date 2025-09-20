@@ -41,10 +41,24 @@ class HackathonDemo:
             return None
     
     def start_frontend(self):
-        """Frontend is now served by the backend - no separate process needed"""
-        print("🎨 Frontend will be served by backend at http://localhost:8000")
-        print("✅ No separate frontend process needed")
-        return None  # No process to manage
+        """Start the frontend using Bun in the frontend directory"""
+        print("🎨 Starting frontend with Bun...")
+        frontend_dir = Path("frontend")
+        if not frontend_dir.exists():
+            print("❌ Frontend directory not found!")
+            return None
+        try:
+            process = subprocess.Popen(
+            ["bun", "run", "dev"],
+            cwd=frontend_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+            )
+            print("✅ Frontend started with Bun in development mode")
+            return process
+        except Exception as e:
+            print(f"❌ Failed to start frontend: {e}")
+            return None
     
     def start_anomaly_detection(self):
         """Start the anomaly detection system"""
@@ -82,7 +96,7 @@ class HackathonDemo:
             time.sleep(5)
             for i, process in enumerate(self.processes):
                 if process and process.poll() is not None:
-                    print(f"⚠️ Process {i} stopped unexpectedly")
+                    print(f"⚠️ Process {i} stopped unexpectedly {process}")
                     # Could add restart logic here
     
     def signal_handler(self, signum, frame):
@@ -124,10 +138,10 @@ class HackathonDemo:
             self.processes.append(backend_process)
             time.sleep(3)  # Give backend time to start
         
-        frontend_process = self.start_frontend()
-        if frontend_process:
-            self.processes.append(frontend_process)
-            time.sleep(3)  # Give frontend time to start
+        # frontend_process = self.start_frontend()
+        # if frontend_process:
+        #     self.processes.append(frontend_process)
+        #     time.sleep(3)  # Give frontend time to start
         
         anomaly_process = self.start_anomaly_detection()
         if anomaly_process:
