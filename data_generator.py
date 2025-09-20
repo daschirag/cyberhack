@@ -1,252 +1,232 @@
+#!/usr/bin/env python3
 """
-Security Event Data Generator
-Fixed version with --mode support for compatibility
+Data Generator for Cybersecurity Anomaly Detection Demo
+Creates realistic streaming data with configurable anomaly rates
 """
 
-import csv
 import json
-import random
 import time
 import os
+import random
 from datetime import datetime, timedelta
+from typing import Dict, List
 import argparse
+import threading
+from pathlib import Path
+import tempfile
 
-class SecurityDataGenerator:
-    """Generate realistic security event data with anomalies"""
-    
-    def __init__(self, anomaly_rate=0.1):
+class CyberSecurityDataGenerator:
+    def __init__(self, anomaly_rate=0.2):
         self.anomaly_rate = anomaly_rate
+        self.running = False
         
-        # Normal patterns
-        self.normal_users = ['alice', 'bob', 'charlie', 'diana', 'eve']
-        self.normal_locations = ['Chennai', 'Mumbai', 'Delhi', 'Bangalore', 'Pune']
-        self.normal_ips = ['192.168.1.10', '192.168.1.11', '192.168.1.12', '192.168.1.13', '192.168.1.14']
+        # Data directories
+        self.base_dir = "./data"
+        self.login_dir = os.path.join(self.base_dir, "login_stream")
+        self.network_dir = os.path.join(self.base_dir, "network_stream") 
+        self.file_dir = os.path.join(self.base_dir, "file_stream")
         
-        # Anomalous patterns
-        self.suspicious_locations = ['Moscow', 'Beijing', 'Lagos', 'Unknown', 'Tor Exit Node']
-        self.suspicious_ips = ['185.220.101.45', '31.13.24.87', '103.251.167.20', '45.142.120.135']
+        # Ensure directories exist
+        for directory in [self.login_dir, self.network_dir, self.file_dir]:
+            os.makedirs(directory, exist_ok=True)
         
-        # File patterns
-        self.normal_files = [
-            ('report.pdf', 2.5), ('presentation.pptx', 8.3), ('data.xlsx', 1.2),
-            ('document.docx', 0.8), ('image.png', 3.4), ('code.py', 0.1)
-        ]
-        self.suspicious_files = [
-            ('database_dump.sql', 500.0), ('customer_data.zip', 250.0),
-            ('passwords.txt', 150.0), ('financial_records.xlsx', 300.0)
-        ]
+        # Sample data for realistic generation
+        self.usernames = ["john_doe", "jane_smith", "alice_wilson", "bob_jones", "charlie_brown", 
+                         "diana_prince", "eve_davis", "frank_miller", "grace_lee", "henry_clark"]
         
-        # Ensure output directories exist
-        os.makedirs('./data/login_stream', exist_ok=True)
-        os.makedirs('./data/network_stream', exist_ok=True)
-        os.makedirs('./data/file_stream', exist_ok=True)
-    
-    def generate_login_event(self, is_anomaly=False):
-        """Generate a login event"""
-        timestamp = datetime.now()
+        self.normal_locations = ["New York", "London", "San Francisco", "Toronto", "Sydney"]
+        self.suspicious_locations = ["Moscow", "Beijing", "Unknown", "Darknet", "TOR_Exit"]
+        
+        self.normal_ips = ["192.168.1.100", "10.0.0.50", "172.16.1.25", "192.168.100.10"]
+        self.suspicious_ips = ["185.220.100.50", "31.13.78.35", "103.251.167.10", "45.142.212.21"]
+        
+        self.normal_files = ["report.pdf", "document.docx", "presentation.pptx", "image.jpg", "data.xlsx"]
+        self.suspicious_files = ["database_backup.sql", "passwords.txt", "customer_data.dump", 
+                               "financial_records.zip", "secret_keys.bak"]
+        
+        self.file_counter = 0
+
+    def safe_write_jsonl(self, directory: str, data: Dict):
+        """Safely write JSON to file using atomic operations"""
+        try:
+            # Create a unique filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+            filename = f"data_{timestamp}.jsonl"
+            filepath = os.path.join(directory, filename)
+            
+            # Use atomic write (write to temp file first, then move)
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.tmp', 
+                                           dir=directory, delete=False) as temp_file:
+                # Write single line of valid JSON
+                json.dump(data, temp_file, default=str)
+                temp_file.write('\n')  # JSONL requires newline
+                temp_file.flush()
+                os.fsync(temp_file.fileno())  # Force write to disk
+                
+            # Atomically move temp file to final location
+            os.rename(temp_file.name, filepath)
+            return True
+            
+        except Exception as e:
+            print(f"Error writing data: {e}")
+            # Clean up temp file if it exists
+            try:
+                os.unlink(temp_file.name)
+            except:
+                pass
+            return False
+
+    def generate_login_event(self) -> Dict:
+        """Generate a realistic login event"""
+        is_anomaly = random.random() < self.anomaly_rate
+        
+        # Choose user and basic details
+        username = random.choice(self.usernames)
         
         if is_anomaly:
-            username = random.choice(self.normal_users)
+            # Create suspicious login
             location = random.choice(self.suspicious_locations)
             ip_address = random.choice(self.suspicious_ips)
-            # Make it at odd hours
-            timestamp = timestamp.replace(hour=random.choice([2, 3, 4, 23]))
+            
+            # Anomalous time (late night or very early morning)
+            if random.random() < 0.5:
+                hour = random.randint(23, 23)  # 11 PM
+                minute = random.randint(0, 59)
+            else:
+                hour = random.randint(1, 4)  # 1-4 AM
+                minute = random.randint(0, 59)
         else:
-            username = random.choice(self.normal_users)
+            # Normal login
             location = random.choice(self.normal_locations)
             ip_address = random.choice(self.normal_ips)
-            # Normal hours (9 AM to 6 PM)
-            hour = timestamp.hour
-            if hour < 9 or hour > 18:
-                timestamp = timestamp.replace(hour=random.randint(9, 18))
+            hour = random.randint(8, 18)  # Business hours
+            minute = random.randint(0, 59)
+        
+        # Create timestamp
+        now = datetime.now().replace(hour=hour, minute=minute, second=random.randint(0, 59))
+        timestamp = now.isoformat() + "Z"
         
         return {
-            'username': username,
-            'location': location,
-            'timestamp': timestamp.isoformat(),
-            'ip_address': ip_address
+            "username": username,
+            "location": location,
+            "timestamp": timestamp,
+            "ip_address": ip_address
         }
-    
-    def generate_network_event(self, is_anomaly=False):
-        """Generate network traffic event"""
-        timestamp = datetime.now()
+
+    def generate_network_event(self) -> Dict:
+        """Generate a realistic network traffic event"""
+        is_anomaly = random.random() < self.anomaly_rate
+        
+        now = datetime.now()
+        timestamp = now.isoformat() + "Z"
+        source_ip = random.choice(self.normal_ips + self.suspicious_ips)
         
         if is_anomaly:
-            requests_per_minute = random.randint(5000, 50000)
-            source_ip = random.choice(self.suspicious_ips)
+            # Traffic spike
+            requests_per_minute = random.randint(1000, 5000)
         else:
+            # Normal traffic
             requests_per_minute = random.randint(50, 200)
-            source_ip = random.choice(self.normal_ips)
         
         return {
-            'timestamp': timestamp.isoformat(),
-            'requests_per_minute': requests_per_minute,
-            'source_ip': source_ip
+            "timestamp": timestamp,
+            "requests_per_minute": requests_per_minute,
+            "source_ip": source_ip
         }
-    
-    def generate_file_event(self, is_anomaly=False):
-        """Generate file transfer event"""
-        timestamp = datetime.now()
-        username = random.choice(self.normal_users)
+
+    def generate_file_event(self) -> Dict:
+        """Generate a realistic file transfer event"""
+        is_anomaly = random.random() < self.anomaly_rate
+        
+        username = random.choice(self.usernames)
+        operation = random.choice(["upload", "download", "access"])
+        now = datetime.now()
+        timestamp = now.isoformat() + "Z"
         
         if is_anomaly:
-            filename, size = random.choice(self.suspicious_files)
-            file_size_mb = size + random.uniform(-50, 50)
-            operation = 'download'
+            # Suspicious file transfer
+            filename = random.choice(self.suspicious_files)
+            file_size_mb = random.uniform(100, 1000)  # Large file
         else:
-            filename, size = random.choice(self.normal_files)
-            file_size_mb = size + random.uniform(-0.5, 0.5)
-            operation = random.choice(['upload', 'download'])
+            # Normal file transfer
+            filename = random.choice(self.normal_files)
+            file_size_mb = random.uniform(1, 50)  # Normal size
         
         return {
-            'username': username,
-            'timestamp': timestamp.isoformat(),
-            'file_size_mb': max(0.1, file_size_mb),
-            'operation': operation,
-            'filename': filename
+            "username": username,
+            "timestamp": timestamp,
+            "file_size_mb": round(file_size_mb, 2),
+            "operation": operation,
+            "filename": filename
         }
-    
-    def write_event_to_csv(self, event_type, event_data):
-        """Write event to CSV file"""
-        if event_type == 'login':
-            filepath = f'./data/login_stream/login_{int(time.time()*1000)}.csv'
-            fieldnames = ['username', 'location', 'timestamp', 'ip_address']
-        elif event_type == 'network':
-            filepath = f'./data/network_stream/network_{int(time.time()*1000)}.csv'
-            fieldnames = ['timestamp', 'requests_per_minute', 'source_ip']
-        elif event_type == 'file':
-            filepath = f'./data/file_stream/file_{int(time.time()*1000)}.csv'
-            fieldnames = ['username', 'timestamp', 'file_size_mb', 'operation', 'filename']
-        else:
-            return None
+
+    def generate_data_continuously(self):
+        """Generate streaming data continuously"""
+        print(f"🎯 Starting data generation (Anomaly rate: {self.anomaly_rate*100}%)")
+        print(f"📁 Output directories:")
+        print(f"   Login: {self.login_dir}")
+        print(f"   Network: {self.network_dir}")
+        print(f"   File: {self.file_dir}")
         
-        with open(filepath, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerow(event_data)
-        
-        return filepath
-    
-    def run_attack_simulation(self, duration=10):
-        """Simulate a coordinated attack"""
-        print("\n" + "="*60)
-        print("SIMULATING COORDINATED ATTACK SCENARIO")
-        print("="*60)
-        
-        # Phase 1: Reconnaissance
-        print("\n[Phase 1: Reconnaissance - Suspicious Login Attempts]")
-        for i in range(3):
-            event = self.generate_login_event(is_anomaly=True)
-            self.write_event_to_csv('login', event)
-            print(f"  - Suspicious login: {event['username']} from {event['location']}")
-            time.sleep(0.5)
-        
-        # Phase 2: DDoS
-        print("\n[Phase 2: DDoS Attack to Distract Security Team]")
-        for i in range(5):
-            event = self.generate_network_event(is_anomaly=True)
-            self.write_event_to_csv('network', event)
-            print(f"  - Traffic spike: {event['requests_per_minute']} req/min")
-            time.sleep(0.3)
-        
-        # Phase 3: Data exfiltration
-        print("\n[Phase 3: Data Exfiltration Attempt]")
-        for i in range(3):
-            event = self.generate_file_event(is_anomaly=True)
-            self.write_event_to_csv('file', event)
-            print(f"  - Large download: {event['filename']} ({event['file_size_mb']:.1f}MB)")
-            time.sleep(0.5)
-        
-        print("\n[Attack simulation complete]")
-        print("="*60)
-    
-    def run_stream_mode(self, interval_seconds=2, duration=None):
-        """Generate continuous stream of events"""
-        print(f"Starting continuous data stream (interval: {interval_seconds}s)")
-        print(f"Anomaly rate: {self.anomaly_rate*100:.1f}%")
-        print("Press Ctrl+C to stop\n")
-        
-        start_time = time.time()
-        event_count = 0
-        
-        try:
-            while True:
-                # Check duration limit
-                if duration and (time.time() - start_time) > duration:
-                    break
+        while self.running:
+            try:
+                # Generate login event
+                login_event = self.generate_login_event()
+                if self.safe_write_jsonl(self.login_dir, login_event):
+                    print(f"✅ Login: {login_event['username']} from {login_event['location']}")
                 
-                # Generate 1-3 events per interval
-                num_events = random.randint(1, 3)
+                # Generate network event  
+                network_event = self.generate_network_event()
+                if self.safe_write_jsonl(self.network_dir, network_event):
+                    rpm = network_event['requests_per_minute']
+                    indicator = "🚨" if rpm > 500 else "📊"
+                    print(f"{indicator} Network: {rpm} RPM from {network_event['source_ip']}")
                 
-                for _ in range(num_events):
-                    event_type = random.choice(['login', 'network', 'file'])
-                    is_anomaly = random.random() < self.anomaly_rate
-                    
-                    if event_type == 'login':
-                        event = self.generate_login_event(is_anomaly)
-                        self.write_event_to_csv('login', event)
-                        status = "🚨 ANOMALY" if is_anomaly else "✓ Normal"
-                        print(f"[{status}] Login: {event['username']} from {event['location']}")
-                    
-                    elif event_type == 'network':
-                        event = self.generate_network_event(is_anomaly)
-                        self.write_event_to_csv('network', event)
-                        status = "🚨 ANOMALY" if is_anomaly else "✓ Normal"
-                        print(f"[{status}] Network: {event['requests_per_minute']} req/min")
-                    
-                    elif event_type == 'file':
-                        event = self.generate_file_event(is_anomaly)
-                        self.write_event_to_csv('file', event)
-                        status = "🚨 ANOMALY" if is_anomaly else "✓ Normal"
-                        print(f"[{status}] File: {event['username']} {event['operation']} {event['file_size_mb']:.1f}MB")
-                    
-                    event_count += 1
+                # Generate file event
+                file_event = self.generate_file_event()
+                if self.safe_write_jsonl(self.file_dir, file_event):
+                    size = file_event['file_size_mb']
+                    indicator = "🚨" if size > 100 else "📄"
+                    print(f"{indicator} File: {file_event['username']} {file_event['operation']} {file_event['filename']} ({size}MB)")
                 
-                print(f"--- Total events: {event_count} ---\n")
-                time.sleep(interval_seconds)
+                # Wait before next generation
+                time.sleep(random.uniform(1, 3))  # 1-3 seconds between events
                 
-        except KeyboardInterrupt:
-            print(f"\nStream stopped. Total events generated: {event_count}")
+            except Exception as e:
+                print(f"❌ Error generating data: {e}")
+                time.sleep(1)
+
+    def start(self):
+        """Start the data generator"""
+        self.running = True
+        self.generate_data_continuously()
+
+    def stop(self):
+        """Stop the data generator"""
+        self.running = False
 
 def main():
-    parser = argparse.ArgumentParser(description='Security Event Data Generator')
-    
-    # Support both old and new argument styles
-    parser.add_argument('--mode', choices=['stream', 'attack'], 
-                       help='Generation mode')
-    parser.add_argument('--anomaly-rate', type=float, default=0.1,
-                       help='Probability of generating anomalies (0.0-1.0)')
-    parser.add_argument('--interval', type=int, default=2,
-                       help='Interval between events in stream mode (seconds)')
-    parser.add_argument('--duration', type=int, default=None,
-                       help='Duration to run in seconds (None=infinite)')
-    
-    # Alternative simple flags
-    parser.add_argument('--attack', action='store_true',
-                       help='Run attack simulation')
-    parser.add_argument('--normal', action='store_true',
-                       help='Generate only normal events')
+    parser = argparse.ArgumentParser(description="Cybersecurity Data Generator")
+    parser.add_argument("--mode", choices=["stream"], default="stream", help="Generation mode")
+    parser.add_argument("--anomaly-rate", type=float, default=0.2, help="Rate of anomalies (0.0-1.0)")
     
     args = parser.parse_args()
     
-    # Handle different argument combinations
-    if args.attack or args.mode == 'attack':
-        generator = SecurityDataGenerator(anomaly_rate=1.0)
-        duration = args.duration if args.duration else 10
-        generator.run_attack_simulation(duration=duration)
+    generator = CyberSecurityDataGenerator(anomaly_rate=args.anomaly_rate)
     
-    elif args.normal:
-        generator = SecurityDataGenerator(anomaly_rate=0.0)
-        generator.run_stream_mode(interval_seconds=args.interval, duration=args.duration)
-    
-    elif args.mode == 'stream':
-        generator = SecurityDataGenerator(anomaly_rate=args.anomaly_rate)
-        generator.run_stream_mode(interval_seconds=args.interval, duration=args.duration)
-    
-    else:
-        # Default: stream mode with specified anomaly rate
-        generator = SecurityDataGenerator(anomaly_rate=args.anomaly_rate)
-        generator.run_stream_mode(interval_seconds=args.interval, duration=args.duration)
+    try:
+        print("🚀 CyberSecurity Data Generator Starting...")
+        print(f"⚙️  Mode: {args.mode}")
+        print(f"📊 Anomaly Rate: {args.anomaly_rate*100}%")
+        print("Press Ctrl+C to stop")
+        print("=" * 50)
+        
+        generator.start()
+        
+    except KeyboardInterrupt:
+        print("\n🛑 Stopping data generator...")
+        generator.stop()
+        print("✅ Data generator stopped")
 
 if __name__ == "__main__":
     main()

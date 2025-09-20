@@ -103,51 +103,110 @@ class AlertAction(BaseModel):
     action: str  # "acknowledge", "investigate", "resolve", "false_positive"
     notes: Optional[str] = None
 
-# Utility functions
+# Utility functions - UPDATED
 def read_jsonl_file(filepath: str) -> List[Dict]:
-    """Read JSONL file and return list of anomalies"""
+    """Read JSONL file and return list of anomalies with robust parsing"""
     anomalies = []
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r') as f:
-                for line in f:
-                    if line.strip():
-                        data = json.loads(line.strip())
-                        if 'anomaly' in data:
-                            anomalies.append(data['anomaly'])
-        except Exception as e:
-            logger.error(f"Error reading {filepath}: {e}")
+    if not os.path.exists(filepath):
+        logger.info(f"File does not exist: {filepath}")
+        return anomalies
+    
+    try:
+        with open(filepath, 'r') as f:
+            line_number = 0
+            for line in f:
+                line_number += 1
+                line = line.strip()
+                if not line:
+                    continue
+                
+                try:
+                    data = json.loads(line)
+                    
+                    # Handle Pathway output format: {"anomaly_data": "JSON_STRING"}
+                    if 'anomaly_data' in data:
+                        try:
+                            if isinstance(data['anomaly_data'], str):
+                                # Parse the JSON string
+                                anomaly = json.loads(data['anomaly_data'])
+                            else:
+                                # Already a dict
+                                anomaly = data['anomaly_data']
+                            anomalies.append(anomaly)
+                        except (json.JSONDecodeError, TypeError) as e:
+                            logger.warning(f"Failed to parse anomaly_data at line {line_number}: {e}")
+                            # Use the raw data as fallback
+                            anomalies.append({'raw_data': data, 'parse_error': str(e)})
+                    
+                    # Handle legacy format: {"anomaly": {...}}
+                    elif 'anomaly' in data:
+                        anomalies.append(data['anomaly'])
+                    
+                    # Handle direct anomaly format (no wrapper)
+                    elif any(key in data for key in ['severity', 'risk_score', 'username', 'timestamp']):
+                        anomalies.append(data)
+                    
+                    else:
+                        logger.debug(f"Unrecognized format at line {line_number}: {data}")
+                        
+                except json.JSONDecodeError as e:
+                    logger.warning(f"JSON decode error in {filepath} at line {line_number}: {e}")
+                    
+    except Exception as e:
+        logger.error(f"Error reading {filepath}: {e}")
+    
+    logger.info(f"Read {len(anomalies)} anomalies from {filepath}")
     return anomalies
 
+
 def get_all_anomalies() -> List[Dict]:
-    """Get all anomalies from output files"""
+    """Get all anomalies from output files with enhanced type detection"""
     all_anomalies = []
     
     # Read from all anomaly files
     anomaly_files = [
-        "./output/login_anomalies.jsonl",
-        "./output/network_anomalies.jsonl", 
-        "./output/file_anomalies.jsonl"
+        "../output/login_anomalies.jsonl",
+        "../output/network_anomalies.jsonl", 
+        "../output/file_anomalies.jsonl"
     ]
     
     for filepath in anomaly_files:
+        logger.info(f"Reading anomalies from: {filepath}")
         anomalies = read_jsonl_file(filepath)
+        
         for anomaly in anomalies:
-            # Add type information
-            if 'location' in anomaly:
-                anomaly['type'] = 'login'
-            elif 'requests_per_minute' in anomaly:
-                anomaly['type'] = 'network'
-            elif 'file_size_mb' in anomaly:
-                anomaly['type'] = 'file_transfer'
-            else:
-                anomaly['type'] = 'unknown'
+            # Enhanced type detection
+            if not anomaly.get('type'):
+                if 'username' in anomaly and 'location' in anomaly:
+                    anomaly['type'] = 'login'
+                elif 'requests_per_minute' in anomaly:
+                    anomaly['type'] = 'network'
+                elif 'file_size_mb' in anomaly or 'filename' in anomaly:
+                    anomaly['type'] = 'file_transfer'
+                elif 'anomaly_data' in anomaly:
+                    anomaly['type'] = 'unknown_pathway'
+                else:
+                    anomaly['type'] = 'unknown'
+            
+            # Ensure required fields exist
+            if not anomaly.get('timestamp'):
+                anomaly['timestamp'] = datetime.now().isoformat()
+            if not anomaly.get('severity'):
+                anomaly['severity'] = 'UNKNOWN'
+            if not anomaly.get('risk_score'):
+                anomaly['risk_score'] = 0
             
             all_anomalies.append(anomaly)
     
     # Sort by timestamp (newest first)
-    all_anomalies.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    all_anomalies.sort(
+        key=lambda x: x.get('timestamp', ''), 
+        reverse=True
+    )
+    
+    logger.info(f"Total anomalies loaded: {len(all_anomalies)}")
     return all_anomalies
+
 
 def calculate_system_stats() -> SystemStats:
     """Calculate system statistics"""
@@ -264,6 +323,55 @@ async def get_severity_breakdown():
         severity_counts[severity] = severity_counts.get(severity, 0) + 1
     
     return severity_counts
+@app.get("/api/debug/files")
+async def debug_files():
+    """Debug endpoint to check file contents"""
+    debug_info = {}
+    
+    files = [
+        "../output/login_anomalies.jsonl",
+        "../output/network_anomalies.jsonl", 
+        "../output/file_anomalies.jsonl"
+    ]
+    
+    for filepath in files:
+        info = {
+            "exists": os.path.exists(filepath),
+            "size": 0,
+            "sample_lines": [],
+            "line_count": 0
+        }
+        
+        if os.path.exists(filepath):
+            try:
+                info["size"] = os.path.getsize(filepath)
+                with open(filepath, 'r') as f:
+                    lines = f.readlines()
+                    info["line_count"] = len(lines)
+                    info["sample_lines"] = [line.strip() for line in lines[:3]]  # First 3 lines
+            except Exception as e:
+                info["error"] = str(e)
+        
+        debug_info[filepath] = info
+    
+    return debug_info
+
+@app.get("/api/debug/raw-anomalies")
+async def debug_raw_anomalies():
+    """Debug endpoint to see raw anomaly data"""
+    raw_data = {}
+    
+    files = [
+        "../output/login_anomalies.jsonl",
+        "../output/network_anomalies.jsonl", 
+        "../output/file_anomalies.jsonl"
+    ]
+    
+    for filepath in files:
+        raw_data[filepath] = read_jsonl_file(filepath)
+    
+    return raw_data
+
 
 # WebSocket endpoint for real-time updates
 @app.websocket("/ws")
@@ -334,7 +442,7 @@ async def serve_static_files(full_path: str):
 
 if __name__ == "__main__":
     # Ensure output directory exists
-    os.makedirs("./output", exist_ok=True)
+    os.makedirs("../output", exist_ok=True)
     
     # Run the server
     uvicorn.run(

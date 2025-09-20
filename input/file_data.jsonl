@@ -1,0 +1,3 @@
+{"username": "john_doe", "timestamp": "2025-09-20T14:30:00Z", "file_size_mb": 50.5, "operation": "upload", "filename": "report.pdf"}
+{"username": "jane_smith", "timestamp": "2025-09-20T14:35:00Z", "file_size_mb": 250.0, "operation": "download", "filename": "database_backup.sql"}
+{"username": "bob_wilson", "timestamp": "2025-09-20T14:40:00Z", "file_size_mb": 15.2, "operation": "upload", "filename": "document.docx"}
