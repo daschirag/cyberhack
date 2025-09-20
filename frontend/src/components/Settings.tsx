@@ -148,7 +148,7 @@ const Settings: React.FC = () => {
           </div>
         </div>
 
-        {/* API Configuration */}
+        {/* API Configuration
         <div className="bg-slate-800 rounded-lg border border-slate-700 p-6 lg:col-span-2">
           <div className="flex items-center space-x-2 mb-6">
             <Key className="text-purple-400" size={24} />
@@ -184,7 +184,7 @@ const Settings: React.FC = () => {
               />
             </div>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Save Button */}

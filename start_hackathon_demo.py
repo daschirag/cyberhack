@@ -104,11 +104,11 @@ class HackathonDemo:
             return None
         try:
             process = subprocess.Popen(
-            ["bun", "run", "dev"],
-            cwd=frontend_dir,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-            )
+                    ["bun", "run", "dev"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    cwd=frontend_path
+                )
             print("✅ Frontend started with Bun in development mode")
             return process
         except Exception as e:
@@ -373,11 +373,11 @@ if __name__ == "__main__":
     
     # Check npm
     try:
-        npm_version = subprocess.check_output(["npm", "--version"], text=True).strip()
-        print(f"   npm: {npm_version} ✅")
+        npm_version = subprocess.check_output(["bun", "--version"], text=True).strip()
+        print(f"   bun: {npm_version} ✅")
     except:
-        print("   npm: Not found ❌")
-        print("   Please install npm: sudo apt install npm")
+        print("   bun: Not found ❌")
+        print("   Please install bun: sudo apt install bun")
         sys.exit(1)
     
     print("✅ Prerequisites check passed!")

@@ -35,12 +35,21 @@ const App: React.FC = () => {
         
         <Toaster
           position="top-right"
+          containerStyle={{
+            top: 20,
+            right: 20,
+            zIndex: 9999,
+          }}
           toastOptions={{
             duration: 4000,
             style: {
               background: '#1e293b',
               color: '#f8fafc',
               border: '1px solid #334155',
+              borderRadius: '8px',
+              fontSize: '14px',
+              fontWeight: '500',
+              zIndex: 9999,
             },
             success: {
               iconTheme: {

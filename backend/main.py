@@ -16,6 +16,9 @@ from typing import List, Dict, Optional
 import uvicorn
 from pydantic import BaseModel
 import logging
+import sys
+sys.path.append('..')
+from mongodb_utils import get_mongodb_manager, get_anomalies, get_anomaly_stats
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,10 +31,19 @@ from contextlib import asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifespan events"""
     # Startup
+    logger.info("Initializing MongoDB connection...")
+    mongodb_manager = get_mongodb_manager()
+    if not mongodb_manager.connect():
+        logger.warning("Failed to connect to MongoDB - some features may not work")
+    else:
+        logger.info("✅ MongoDB connected successfully")
+    
     asyncio.create_task(monitor_anomalies())
     logger.info("Anomaly monitoring started")
     yield
-    # Shutdown (if needed)
+    # Shutdown
+    logger.info("Disconnecting from MongoDB...")
+    mongodb_manager.disconnect()
     logger.info("Application shutting down")
 
 app = FastAPI(
@@ -103,76 +115,12 @@ class AlertAction(BaseModel):
     action: str  # "acknowledge", "investigate", "resolve", "false_positive"
     notes: Optional[str] = None
 
-# Utility functions - UPDATED
-def read_jsonl_file(filepath: str) -> List[Dict]:
-    """Read JSONL file and return list of anomalies with robust parsing"""
-    anomalies = []
-    if not os.path.exists(filepath):
-        logger.info(f"File does not exist: {filepath}")
-        return anomalies
-    
-    try:
-        with open(filepath, 'r') as f:
-            line_number = 0
-            for line in f:
-                line_number += 1
-                line = line.strip()
-                if not line:
-                    continue
-                
-                try:
-                    data = json.loads(line)
-                    
-                    # Handle Pathway output format: {"anomaly_data": "JSON_STRING"}
-                    if 'anomaly_data' in data:
-                        try:
-                            if isinstance(data['anomaly_data'], str):
-                                # Parse the JSON string
-                                anomaly = json.loads(data['anomaly_data'])
-                            else:
-                                # Already a dict
-                                anomaly = data['anomaly_data']
-                            anomalies.append(anomaly)
-                        except (json.JSONDecodeError, TypeError) as e:
-                            logger.warning(f"Failed to parse anomaly_data at line {line_number}: {e}")
-                            # Use the raw data as fallback
-                            anomalies.append({'raw_data': data, 'parse_error': str(e)})
-                    
-                    # Handle legacy format: {"anomaly": {...}}
-                    elif 'anomaly' in data:
-                        anomalies.append(data['anomaly'])
-                    
-                    # Handle direct anomaly format (no wrapper)
-                    elif any(key in data for key in ['severity', 'risk_score', 'username', 'timestamp']):
-                        anomalies.append(data)
-                    
-                    else:
-                        logger.debug(f"Unrecognized format at line {line_number}: {data}")
-                        
-                except json.JSONDecodeError as e:
-                    logger.warning(f"JSON decode error in {filepath} at line {line_number}: {e}")
-                    
-    except Exception as e:
-        logger.error(f"Error reading {filepath}: {e}")
-    
-    logger.info(f"Read {len(anomalies)} anomalies from {filepath}")
-    return anomalies
-
-
+# Utility functions - MongoDB implementation
 def get_all_anomalies() -> List[Dict]:
-    """Get all anomalies from output files with enhanced type detection"""
-    all_anomalies = []
-    
-    # Read from all anomaly files
-    anomaly_files = [
-        "../output/login_anomalies.jsonl",
-        "../output/network_anomalies.jsonl", 
-        "../output/file_anomalies.jsonl"
-    ]
-    
-    for filepath in anomaly_files:
-        logger.info(f"Reading anomalies from: {filepath}")
-        anomalies = read_jsonl_file(filepath)
+    """Get all anomalies from MongoDB with enhanced type detection"""
+    try:
+        # Get anomalies from MongoDB
+        anomalies = get_anomalies(limit=1000)  # Get more than default for complete view
         
         for anomaly in anomalies:
             # Enhanced type detection
@@ -195,37 +143,50 @@ def get_all_anomalies() -> List[Dict]:
                 anomaly['severity'] = 'UNKNOWN'
             if not anomaly.get('risk_score'):
                 anomaly['risk_score'] = 0
-            
-            all_anomalies.append(anomaly)
-    
-    # Sort by timestamp (newest first)
-    all_anomalies.sort(
-        key=lambda x: x.get('timestamp', ''), 
-        reverse=True
-    )
-    
-    logger.info(f"Total anomalies loaded: {len(all_anomalies)}")
-    return all_anomalies
+        
+        logger.info(f"Total anomalies loaded from MongoDB: {len(anomalies)}")
+        return anomalies
+        
+    except Exception as e:
+        logger.error(f"Error retrieving anomalies from MongoDB: {e}")
+        return []
 
 
 def calculate_system_stats() -> SystemStats:
-    """Calculate system statistics"""
-    anomalies = get_all_anomalies()
-    
-    critical_count = sum(1 for a in anomalies if a.get('severity') == 'CRITICAL')
-    high_count = sum(1 for a in anomalies if a.get('severity') == 'HIGH')
-    medium_count = sum(1 for a in anomalies if a.get('severity') == 'MEDIUM')
-    low_count = sum(1 for a in anomalies if a.get('severity') == 'LOW')
-    
-    return SystemStats(
-        total_anomalies=len(anomalies),
-        critical_count=critical_count,
-        high_count=high_count,
-        medium_count=medium_count,
-        low_count=low_count,
-        last_updated=datetime.now().isoformat(),
-        system_uptime="2h 34m"  # This would be calculated from actual uptime
-    )
+    """Calculate system statistics using MongoDB aggregation"""
+    try:
+        # Use MongoDB aggregation for efficient stats calculation
+        stats = get_anomaly_stats()
+        
+        return SystemStats(
+            total_anomalies=stats.get('total_anomalies', 0),
+            critical_count=stats.get('critical_count', 0),
+            high_count=stats.get('high_count', 0),
+            medium_count=stats.get('medium_count', 0),
+            low_count=stats.get('low_count', 0),
+            last_updated=datetime.now().isoformat(),
+            system_uptime="2h 34m"  # This would be calculated from actual uptime
+        )
+        
+    except Exception as e:
+        logger.error(f"Error calculating system stats: {e}")
+        # Fallback to counting anomalies
+        anomalies = get_all_anomalies()
+        
+        critical_count = sum(1 for a in anomalies if a.get('severity') == 'CRITICAL')
+        high_count = sum(1 for a in anomalies if a.get('severity') == 'HIGH')
+        medium_count = sum(1 for a in anomalies if a.get('severity') == 'MEDIUM')
+        low_count = sum(1 for a in anomalies if a.get('severity') == 'LOW')
+        
+        return SystemStats(
+            total_anomalies=len(anomalies),
+            critical_count=critical_count,
+            high_count=high_count,
+            medium_count=medium_count,
+            low_count=low_count,
+            last_updated=datetime.now().isoformat(),
+            system_uptime="2h 34m"
+        )
 
 # API Routes
 @app.get("/")
@@ -237,29 +198,30 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.get("/api/anomalies", response_model=List[AnomalyResponse])
-async def get_anomalies(limit: int = 50, severity: Optional[str] = None):
+async def get_anomalies_endpoint(limit: int = 50, severity: Optional[str] = None, 
+                                anomaly_type: Optional[str] = None):
     """Get recent anomalies with optional filtering"""
-    anomalies = get_all_anomalies()
-    
-    if severity:
-        anomalies = [a for a in anomalies if a.get('severity') == severity.upper()]
-    
-    # Limit results
-    anomalies = anomalies[:limit]
-    
-    # Convert to response model
-    response = []
-    for anomaly in anomalies:
-        response.append(AnomalyResponse(
-            timestamp=anomaly.get('timestamp', ''),
-            type=anomaly.get('type', 'unknown'),
-            severity=anomaly.get('severity', 'UNKNOWN'),
-            risk_score=anomaly.get('risk_score', 0.0),
-            details=anomaly,
-            explanation=anomaly.get('explanation', 'No explanation available')
-        ))
-    
-    return response
+    try:
+        # Use MongoDB filtering for better performance
+        anomalies = get_anomalies(limit=limit, severity=severity, anomaly_type=anomaly_type)
+        
+        # Convert to response model
+        response = []
+        for anomaly in anomalies:
+            response.append(AnomalyResponse(
+                timestamp=anomaly.get('timestamp', ''),
+                type=anomaly.get('type', 'unknown'),
+                severity=anomaly.get('severity', 'UNKNOWN'),
+                risk_score=anomaly.get('risk_score', 0.0),
+                details=anomaly,
+                explanation=anomaly.get('explanation', 'No explanation available')
+            ))
+        
+        return response
+        
+    except Exception as e:
+        logger.error(f"Error retrieving anomalies: {e}")
+        return []
 
 @app.get("/api/stats", response_model=SystemStats)
 async def get_system_stats():
@@ -269,19 +231,14 @@ async def get_system_stats():
 @app.get("/api/anomalies/recent")
 async def get_recent_anomalies(hours: int = 1):
     """Get anomalies from the last N hours"""
-    cutoff_time = datetime.now() - timedelta(hours=hours)
-    anomalies = get_all_anomalies()
-    
-    recent_anomalies = []
-    for anomaly in anomalies:
-        try:
-            anomaly_time = datetime.fromisoformat(anomaly.get('timestamp', '').replace('Z', '+00:00'))
-            if anomaly_time >= cutoff_time:
-                recent_anomalies.append(anomaly)
-        except:
-            continue
-    
-    return recent_anomalies
+    try:
+        # Use MongoDB time-based filtering for better performance
+        anomalies = get_anomalies(limit=100, hours=hours)
+        return anomalies
+        
+    except Exception as e:
+        logger.error(f"Error retrieving recent anomalies: {e}")
+        return []
 
 @app.post("/api/alerts/{anomaly_id}/action")
 async def handle_alert_action(anomaly_id: str, action: AlertAction):
@@ -302,75 +259,107 @@ async def handle_alert_action(anomaly_id: str, action: AlertAction):
 
 @app.get("/api/anomalies/types")
 async def get_anomaly_types():
-    """Get breakdown of anomaly types"""
-    anomalies = get_all_anomalies()
-    
-    type_counts = {}
-    for anomaly in anomalies:
-        anomaly_type = anomaly.get('type', 'unknown')
-        type_counts[anomaly_type] = type_counts.get(anomaly_type, 0) + 1
-    
-    return type_counts
+    """Get breakdown of anomaly types using MongoDB aggregation"""
+    try:
+        mongodb_manager = get_mongodb_manager()
+        if not mongodb_manager.is_connected():
+            mongodb_manager.connect()
+        
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$type",
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"count": -1}
+            }
+        ]
+        
+        results = list(mongodb_manager.anomalies_collection.aggregate(pipeline))
+        type_counts = {result["_id"] or "unknown": result["count"] for result in results}
+        
+        return type_counts
+        
+    except Exception as e:
+        logger.error(f"Error getting anomaly types: {e}")
+        return {}
 
 @app.get("/api/anomalies/severity")
 async def get_severity_breakdown():
-    """Get severity level breakdown"""
-    anomalies = get_all_anomalies()
-    
-    severity_counts = {}
-    for anomaly in anomalies:
-        severity = anomaly.get('severity', 'UNKNOWN')
-        severity_counts[severity] = severity_counts.get(severity, 0) + 1
-    
-    return severity_counts
-@app.get("/api/debug/files")
-async def debug_files():
-    """Debug endpoint to check file contents"""
-    debug_info = {}
-    
-    files = [
-        "../output/login_anomalies.jsonl",
-        "../output/network_anomalies.jsonl", 
-        "../output/file_anomalies.jsonl"
-    ]
-    
-    for filepath in files:
-        info = {
-            "exists": os.path.exists(filepath),
-            "size": 0,
-            "sample_lines": [],
-            "line_count": 0
+    """Get severity level breakdown using MongoDB aggregation"""
+    try:
+        mongodb_manager = get_mongodb_manager()
+        if not mongodb_manager.is_connected():
+            mongodb_manager.connect()
+        
+        pipeline = [
+            {
+                "$group": {
+                    "_id": "$severity",
+                    "count": {"$sum": 1}
+                }
+            },
+            {
+                "$sort": {"count": -1}
+            }
+        ]
+        
+        results = list(mongodb_manager.anomalies_collection.aggregate(pipeline))
+        severity_counts = {result["_id"] or "UNKNOWN": result["count"] for result in results}
+        
+        return severity_counts
+        
+    except Exception as e:
+        logger.error(f"Error getting severity breakdown: {e}")
+        return {}
+@app.get("/api/debug/mongodb")
+async def debug_mongodb():
+    """Debug endpoint to check MongoDB connection and collections"""
+    try:
+        mongodb_manager = get_mongodb_manager()
+        
+        debug_info = {
+            "connected": mongodb_manager.is_connected(),
+            "database": mongodb_manager.database_name,
+            "collections": {}
         }
         
-        if os.path.exists(filepath):
-            try:
-                info["size"] = os.path.getsize(filepath)
-                with open(filepath, 'r') as f:
-                    lines = f.readlines()
-                    info["line_count"] = len(lines)
-                    info["sample_lines"] = [line.strip() for line in lines[:3]]  # First 3 lines
-            except Exception as e:
-                info["error"] = str(e)
+        if mongodb_manager.is_connected():
+            # Get collection stats
+            collections = [
+                ("anomalies", mongodb_manager.anomalies_collection),
+                ("logs", mongodb_manager.logs_collection),
+                ("users", mongodb_manager.users_collection)
+            ]
+            
+            for name, collection in collections:
+                try:
+                    count = collection.count_documents({})
+                    debug_info["collections"][name] = {
+                        "count": count,
+                        "sample_documents": list(collection.find().limit(2))
+                    }
+                except Exception as e:
+                    debug_info["collections"][name] = {"error": str(e)}
         
-        debug_info[filepath] = info
-    
-    return debug_info
+        return debug_info
+        
+    except Exception as e:
+        return {"error": f"Failed to connect to MongoDB: {e}"}
 
 @app.get("/api/debug/raw-anomalies")
 async def debug_raw_anomalies():
-    """Debug endpoint to see raw anomaly data"""
-    raw_data = {}
-    
-    files = [
-        "../output/login_anomalies.jsonl",
-        "../output/network_anomalies.jsonl", 
-        "../output/file_anomalies.jsonl"
-    ]
-    
-    for filepath in files:
-        raw_data[filepath] = read_jsonl_file(filepath)
-    
-    return raw_data
+    """Debug endpoint to see raw anomaly data from MongoDB"""
+    try:
+        # Get recent anomalies from MongoDB
+        anomalies = get_anomalies(limit=10)
+        return {"mongodb_anomalies": anomalies}
+        
+    except Exception as e:
+        logger.error(f"Error retrieving raw anomalies: {e}")
+        return {"error": str(e)}
 
 
 # WebSocket endpoint for real-time updates

@@ -7,8 +7,6 @@ fastapi>=0.104.1
 uvicorn[standard]>=0.24.0
 
 # Data Processing and Analysis
-pandas>=2.0.0
-numpy>=1.24.0
 python-dateutil>=2.8.0
 
 # Web Framework and API
@@ -18,6 +16,10 @@ pydantic>=2.5.0
 
 # Environment and Configuration
 python-dotenv>=1.0.0
+
+# MongoDB and Database
+pymongo>=4.6.0
+motor>=3.3.0
 
 # AI and Machine Learning
 openai>=1.0.0

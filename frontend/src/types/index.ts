@@ -1,10 +1,15 @@
 // Anomaly types
 export interface Anomaly {
+  id:string;
   timestamp: string;
   type: string;
   severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   explanation?: string;
   risk_score: number;
+  source_ip: string;
+  description: string;
+  status: string;
+  confidence: number;
 }
 
 // Stats types

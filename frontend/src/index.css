@@ -95,3 +95,18 @@ code {
 .gradient-success {
   background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
 }
+
+/* Toast container styles */
+.toaster-container {
+  z-index: 9999 !important;
+}
+
+/* Ensure toasts are visible */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
+
+/* React Hot Toast specific styles */
+.go3958317564 {
+  z-index: 9999 !important;
+}

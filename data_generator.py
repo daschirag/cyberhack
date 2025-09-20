@@ -14,19 +14,33 @@ import argparse
 import threading
 from pathlib import Path
 import tempfile
+from dotenv import load_dotenv
+import sys
+sys.path.append('.')
+from mongodb_utils import get_mongodb_manager, insert_anomaly
+
+# Load environment variables
+load_dotenv()
 
 class CyberSecurityDataGenerator:
     def __init__(self, anomaly_rate=0.2):
         self.anomaly_rate = anomaly_rate
         self.running = False
         
-        # Data directories
+        # Initialize MongoDB connection
+        self.mongodb_manager = get_mongodb_manager()
+        self.use_mongodb = True
+        if not self.mongodb_manager.connect():
+            print("⚠️  MongoDB connection failed, falling back to file-based storage")
+            self.use_mongodb = False
+        
+        # Data directories (for backward compatibility)
         self.base_dir = "./data"
         self.login_dir = os.path.join(self.base_dir, "login_stream")
         self.network_dir = os.path.join(self.base_dir, "network_stream") 
         self.file_dir = os.path.join(self.base_dir, "file_stream")
         
-        # Ensure directories exist
+        # Ensure directories exist (for backward compatibility)
         for directory in [self.login_dir, self.network_dir, self.file_dir]:
             os.makedirs(directory, exist_ok=True)
         
@@ -46,8 +60,50 @@ class CyberSecurityDataGenerator:
         
         self.file_counter = 0
 
+    def store_data(self, data_type: str, data: Dict) -> bool:
+        """Store data in MongoDB or fallback to file system"""
+        try:
+            if self.use_mongodb:
+                # Store in MongoDB with type information
+                data_with_type = {
+                    "data_type": data_type,
+                    "generated_at": datetime.utcnow(),
+                    **data
+                }
+                
+                # Use the appropriate collection based on data type
+                if data_type == "login":
+                    collection = self.mongodb_manager.db.get_collection("login_events")
+                elif data_type == "network":
+                    collection = self.mongodb_manager.db.get_collection("network_events")
+                elif data_type == "file":
+                    collection = self.mongodb_manager.db.get_collection("file_events")
+                else:
+                    collection = self.mongodb_manager.db.get_collection("raw_events")
+                
+                collection.insert_one(data_with_type)
+                return True
+            else:
+                # Fallback to file-based storage
+                return self.safe_write_jsonl(self.get_directory_for_type(data_type), data)
+                
+        except Exception as e:
+            print(f"Error storing {data_type} data: {e}")
+            return False
+    
+    def get_directory_for_type(self, data_type: str) -> str:
+        """Get directory path for data type"""
+        if data_type == "login":
+            return self.login_dir
+        elif data_type == "network":
+            return self.network_dir
+        elif data_type == "file":
+            return self.file_dir
+        else:
+            return self.base_dir
+
     def safe_write_jsonl(self, directory: str, data: Dict):
-        """Safely write JSON to file using atomic operations"""
+        """Safely write JSON to file using atomic operations (fallback method)"""
         try:
             # Create a unique filename with timestamp
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
@@ -110,7 +166,8 @@ class CyberSecurityDataGenerator:
             "username": username,
             "location": location,
             "timestamp": timestamp,
-            "ip_address": ip_address
+            "ip_address": ip_address,
+            "processed": False
         }
 
     def generate_network_event(self) -> Dict:
@@ -131,7 +188,8 @@ class CyberSecurityDataGenerator:
         return {
             "timestamp": timestamp,
             "requests_per_minute": requests_per_minute,
-            "source_ip": source_ip
+            "source_ip": source_ip,
+            "processed": False
         }
 
     def generate_file_event(self) -> Dict:
@@ -157,13 +215,18 @@ class CyberSecurityDataGenerator:
             "timestamp": timestamp,
             "file_size_mb": round(file_size_mb, 2),
             "operation": operation,
-            "filename": filename
+            "filename": filename,
+            "processed": False
         }
 
     def generate_data_continuously(self):
         """Generate streaming data continuously"""
         print(f"🎯 Starting data generation (Anomaly rate: {self.anomaly_rate*100}%)")
-        print(f"📁 Output directories:")
+        if self.use_mongodb:
+            print("📊 Storage: MongoDB (primary)")
+            print("📁 Fallback directories:")
+        else:
+            print("📁 Storage: File system (MongoDB unavailable)")
         print(f"   Login: {self.login_dir}")
         print(f"   Network: {self.network_dir}")
         print(f"   File: {self.file_dir}")
@@ -172,19 +235,19 @@ class CyberSecurityDataGenerator:
             try:
                 # Generate login event
                 login_event = self.generate_login_event()
-                if self.safe_write_jsonl(self.login_dir, login_event):
+                if self.store_data("login", login_event):
                     print(f"✅ Login: {login_event['username']} from {login_event['location']}")
                 
                 # Generate network event  
                 network_event = self.generate_network_event()
-                if self.safe_write_jsonl(self.network_dir, network_event):
+                if self.store_data("network", network_event):
                     rpm = network_event['requests_per_minute']
                     indicator = "🚨" if rpm > 500 else "📊"
                     print(f"{indicator} Network: {rpm} RPM from {network_event['source_ip']}")
                 
                 # Generate file event
                 file_event = self.generate_file_event()
-                if self.safe_write_jsonl(self.file_dir, file_event):
+                if self.store_data("file", file_event):
                     size = file_event['file_size_mb']
                     indicator = "🚨" if size > 100 else "📄"
                     print(f"{indicator} File: {file_event['username']} {file_event['operation']} {file_event['filename']} ({size}MB)")

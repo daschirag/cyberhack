@@ -12,6 +12,11 @@ import json
 import time
 import os
 from collections import deque, Counter
+from dotenv import load_dotenv
+from mongodb_utils import get_mongodb_manager, get_anomalies, get_anomaly_stats
+
+# Load environment variables
+load_dotenv()
 
 # Page config
 st.set_page_config(
@@ -59,25 +64,31 @@ st.markdown("""
 """)
 
 def load_anomalies():
-    """Load anomaly data from JSON files"""
-    anomalies = {
-        'login': [],
-        'network': [],
-        'file': []
-    }
-    
-    for anomaly_type in anomalies.keys():
-        filepath = f'./output/{anomaly_type}_anomalies.jsonl'
-        if os.path.exists(filepath):
-            try:
-                with open(filepath, 'r') as f:
-                    for line in f:
-                        if line.strip():
-                            anomalies[anomaly_type].append(json.loads(line))
-            except Exception as e:
-                st.error(f"Error loading {anomaly_type} anomalies: {e}")
-    
-    return anomalies
+    """Load anomaly data from MongoDB"""
+    try:
+        # Get all anomalies from MongoDB
+        all_anomalies = get_anomalies(limit=1000)
+        
+        # Group by type
+        anomalies = {
+            'login': [],
+            'network': [],
+            'file': [],
+            'unknown': []
+        }
+        
+        for anomaly in all_anomalies:
+            anomaly_type = anomaly.get('type', 'unknown')
+            if anomaly_type in anomalies:
+                anomalies[anomaly_type].append(anomaly)
+            else:
+                anomalies['unknown'].append(anomaly)
+        
+        return anomalies
+        
+    except Exception as e:
+        st.error(f"Error loading anomalies from MongoDB: {e}")
+        return {'login': [], 'network': [], 'file': [], 'unknown': []}
 
 def display_anomaly_alert(anomaly, anomaly_type):
     """Display a single anomaly as an alert card"""
