@@ -12,6 +12,8 @@ import signal
 import threading
 import requests
 from pathlib import Path
+import logging
+from rag.rag_pipeline import get_rag_pipeline
 
 class HackathonDemo:
     def __init__(self):
@@ -19,7 +21,7 @@ class HackathonDemo:
         self.running = True
         self.health_check_interval = 10
         
-    def wait_for_backend(self, max_attempts=30):
+    def wait_for_backend(self, max_attempts=500):
         """Wait for backend to be ready"""
         print("⏳ Waiting for backend to be ready...")
         for attempt in range(max_attempts):
@@ -63,7 +65,10 @@ class HackathonDemo:
             "./data/login_stream", 
             "./data/network_stream",
             "./data/file_stream",
-            "./logs"
+            "./logs",
+            # ADD THESE RAG DIRECTORIES
+            "./chroma_db",           # For vector database
+            "./rag/knowledge_base"   # For knowledge base files
         ]
         
         print("📁 Setting up directory structure...")
@@ -71,7 +76,32 @@ class HackathonDemo:
             os.makedirs(directory, exist_ok=True)
             os.chmod(directory, 0o755)
         print("✅ Directory structure ready")
-        
+
+    def initialize_rag_pipeline(self):
+        """Initialize RAG pipeline before starting services"""
+        print("🧠 Initializing RAG pipeline...")
+        try:
+            # Initialize RAG
+            rag = get_rag_pipeline()
+            status = rag.get_pipeline_status()
+            
+            print(f"   RAG Enabled: {status.get('rag_enabled', False)}")
+            print(f"   Knowledge Base Documents: {status.get('knowledge_base_documents', 0)}")
+            print(f"   Vector Store Documents: {status.get('vector_store_info', {}).get('document_count', 0)}")
+            print(f"   OpenAI Model: {status.get('openai_model', 'Not configured')}")
+            
+            if status.get('initialized', False):
+                print("✅ RAG pipeline initialized successfully")
+                return True
+            else:
+                print("⚠️ RAG pipeline not fully initialized")
+                return False
+                
+        except Exception as e:
+            print(f"❌ RAG initialization failed: {e}")
+            print("   System will run without RAG enhancement")
+            return False
+    
     def start_backend(self):
         """Start the FastAPI backend on port 8000"""
         print("🚀 Starting FastAPI backend...")
@@ -256,6 +286,10 @@ class HackathonDemo:
         # Setup directories
         self.check_directory_structure()
         
+        # ADD RAG INITIALIZATION HERE (before backend)
+        print("\n" + "="*30 + " RAG SETUP " + "="*30)
+        rag_ready = self.initialize_rag_pipeline()
+
         # Start backend first
         print("\n" + "="*30 + " BACKEND " + "="*30)
         backend_process = self.start_backend()
@@ -300,6 +334,8 @@ class HackathonDemo:
         print("🔧 Backend API: http://localhost:8000")
         print("📊 API Documentation: http://localhost:8000/docs")
         print("🔍 Debug Endpoint: http://localhost:8000/api/debug/files")
+        print("🧠 RAG Status: http://localhost:8000/api/rag/status")
+        print("💡 RAG Explanation: http://localhost:8000/api/rag/explain")
         print("🛡️ Anomaly Detection: Running")
         print("📈 Data Generator: Running (30% anomaly rate)")
         print("\n📁 Log Files:")
@@ -315,6 +351,8 @@ class HackathonDemo:
         print("   Check backend health: curl http://localhost:8000/api/health")
         print("   Check anomalies: curl http://localhost:8000/api/anomalies")
         print("   Debug files: curl http://localhost:8000/api/debug/files")
+        print("   Check RAG status: curl http://localhost:8000/api/rag/status")
+        print("   Test RAG explain: curl -X POST http://localhost:8000/api/rag/explain -H 'Content-Type: application/json' -d '{\"type\":\"login_anomaly\"}'")
         print("   View logs: tail -f ./logs/backend.log")
         print("\nPress Ctrl+C to stop all services")
         print("=" * 60)

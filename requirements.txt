@@ -42,3 +42,11 @@ requests>=2.31.0
 # kafka-python>=2.0.0  # Uncomment for Kafka integration
 # boto3>=1.28.0        # Uncomment for AWS Kinesis integration
 # redis>=4.6.0         # Uncomment for Redis caching
+# RAG Requirements - NEW
+openai>=1.35.0
+chromadb>=0.5.5
+tiktoken>=0.7.0
+
+# Additional for robust deployment
+logging>=0.4.9.6
+pathlib>=1.0.1

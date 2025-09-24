@@ -17,6 +17,11 @@ import uvicorn
 from pydantic import BaseModel
 import logging
 
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from rag.rag_pipeline import get_rag_pipeline
+import json
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -439,6 +444,88 @@ async def serve_static_files(full_path: str):
     
     # For any other route, serve the dashboard
     return FileResponse("frontend/index.html")
+
+@app.get("/api/rag/status")
+async def get_rag_status():
+    """Get RAG pipeline status"""
+    try:
+        rag = get_rag_pipeline()
+        status = rag.get_pipeline_status()
+        return status
+    except Exception as e:
+        logger.error(f"Error getting RAG status: {e}")
+        return {"error": str(e), "rag_enabled": False}
+
+@app.post("/api/rag/explain")
+async def explain_anomaly(request: dict):
+    """Generate RAG explanation for an anomaly"""
+    try:
+        rag = get_rag_pipeline()
+        enriched = rag.enrich_anomaly(request)
+        return enriched
+    except Exception as e:
+        logger.error(f"Error generating RAG explanation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/rag/reload")
+async def reload_knowledge_base():
+    """Reload RAG knowledge base"""
+    try:
+        rag = get_rag_pipeline()
+        success = rag.reload_knowledge_base()
+        return {"success": success, "message": "Knowledge base reloaded" if success else "Reload failed"}
+    except Exception as e:
+        logger.error(f"Error reloading knowledge base: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Update the get_all_anomalies function to handle RAG-enriched anomalies
+def get_all_anomalies() -> List[Dict]:
+    """Get all anomalies from output files with RAG enrichment"""
+    all_anomalies = []
+    
+    # Read from all anomaly files (existing code)
+    anomaly_files = [
+        "../output/login_anomalies.jsonl",
+        "../output/network_anomalies.jsonl", 
+        "../output/file_anomalies.jsonl"
+    ]
+    
+    for filepath in anomaly_files:
+        logger.info(f"Reading anomalies from: {filepath}")
+        anomalies = read_jsonl_file(filepath)
+        
+        for anomaly in anomalies:
+            # Enhanced type detection (existing code)
+            if not anomaly.get('type'):
+                if 'username' in anomaly and 'location' in anomaly:
+                    anomaly['type'] = 'login'
+                elif 'requests_per_minute' in anomaly:
+                    anomaly['type'] = 'network'
+                elif 'file_size_mb' in anomaly or 'filename' in anomaly:
+                    anomaly['type'] = 'file_transfer'
+                elif 'anomaly_data' in anomaly:
+                    anomaly['type'] = 'unknown_pathway'
+                else:
+                    anomaly['type'] = 'unknown'
+            
+            # Ensure required fields exist (existing code)
+            if not anomaly.get('timestamp'):
+                anomaly['timestamp'] = datetime.now().isoformat()
+            if not anomaly.get('severity'):
+                anomaly['severity'] = 'UNKNOWN'
+            if not anomaly.get('risk_score'):
+                anomaly['risk_score'] = 0
+            
+            all_anomalies.append(anomaly)
+    
+    # Sort by timestamp (newest first)
+    all_anomalies.sort(
+        key=lambda x: x.get('timestamp', ''), 
+        reverse=True
+    )
+    
+    logger.info(f"Total anomalies loaded: {len(all_anomalies)}")
+    return all_anomalies
 
 if __name__ == "__main__":
     # Ensure output directory exists

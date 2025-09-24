@@ -5,7 +5,7 @@ Integrated with data generator for hackathon demo
 """
 
 import pathway as pw
-from pathway.stdlib.ml.index import KNNIndex
+# from pathway.stdlib.ml.index import KNNIndex
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -20,6 +20,7 @@ from collections import deque, defaultdict
 import hashlib
 import time
 from dotenv import load_dotenv
+from rag.rag_pipeline import get_rag_pipeline, enrich_anomaly_with_rag
 
 # Load environment variables from .env file
 load_dotenv()
@@ -63,7 +64,7 @@ class Config:
     MAX_ALERTS_PER_WINDOW = 10  # Maximum alerts per time window
     
     # Directory configuration - Updated for data generator integration
-    OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./output")
+    OUTPUT_DIR = os.path.abspath("./output")
     DATA_DIR = os.getenv("DATA_DIR", "./data")
     
     # Streaming data directories (created by data generator)
@@ -71,77 +72,51 @@ class Config:
     NETWORK_STREAM_DIR = os.path.join(DATA_DIR, "network_stream")  
     FILE_STREAM_DIR = os.path.join(DATA_DIR, "file_stream")
     
-    # State persistence
-    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
-    STATE_BACKEND = os.getenv("STATE_BACKEND", "memory")  # memory, redis, or rocksdb
+    # # State persistence
+    # REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    # STATE_BACKEND = os.getenv("STATE_BACKEND", "memory")  # memory, redis, or rocksdb
     
-    # Alert endpoints
-    SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
-    DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
+    # # Alert endpoints
+    # SLACK_WEBHOOK_URL = os.getenv("SLACK_WEBHOOK_URL", "")
+    # DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
     
-    # LLM Configuration
-    USE_LLM = os.getenv("USE_LLM", "true").lower() == "true"
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
-    OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
-    PREFER_LOCAL_LLM = os.getenv("PREFER_LOCAL_LLM", "false").lower() == "true"
+    # # LLM Configuration
+    # USE_LLM = os.getenv("USE_LLM", "true").lower() == "true"
+    # OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    # OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-3.5-turbo")
+    # OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+    # PREFER_LOCAL_LLM = os.getenv("PREFER_LOCAL_LLM", "false").lower() == "true"
     
-    # KNN Anomaly Detection
-    USE_KNN_DETECTION = os.getenv("USE_KNN_DETECTION", "false").lower() == "true"
-    KNN_NEIGHBORS = 5
-    ANOMALY_THRESHOLD = 2.0  # Standard deviations from mean
+    # # KNN Anomaly Detection
+    # USE_KNN_DETECTION = os.getenv("USE_KNN_DETECTION", "false").lower() == "true"
+    # KNN_NEIGHBORS = 5
+    # ANOMALY_THRESHOLD = 2.0  # Standard deviations from mean
     
-    # Knowledge Base Configuration
-    KB_ENABLE_RAG = os.getenv("KB_ENABLE_RAG", "true").lower() == "true"
-    KB_CONTEXT_MAX_ITEMS = int(os.getenv("KB_CONTEXT_MAX_ITEMS", "5"))
-    KB_PII_EXPORT = os.getenv("KB_PII_EXPORT", "false").lower() == "true"
+    # # Knowledge Base Configuration
+    # KB_ENABLE_RAG = os.getenv("KB_ENABLE_RAG", "true").lower() == "true"
+    # KB_CONTEXT_MAX_ITEMS = int(os.getenv("KB_CONTEXT_MAX_ITEMS", "5"))
+    # KB_PII_EXPORT = os.getenv("KB_PII_EXPORT", "false").lower() == "true"
     
-    # Vector Database Configuration
-    VECTOR_DB_BACKEND = os.getenv("VECTOR_DB_BACKEND", "chroma")  # chroma, pinecone, or none
-    VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "")
-    VECTOR_COLLECTION = os.getenv("VECTOR_COLLECTION", "anomalies")
+    # # Vector Database Configuration
+    # VECTOR_DB_BACKEND = os.getenv("VECTOR_DB_BACKEND", "chroma")  # chroma, pinecone, or none
+    # VECTOR_DB_URL = os.getenv("VECTOR_DB_URL", "")
+    # VECTOR_COLLECTION = os.getenv("VECTOR_COLLECTION", "anomalies")
 
-# ==================== State Management ====================
+    # RAG Integration
+    RAG_ENABLE = os.getenv("KB_ENABLE_RAG", "true").lower() == "true"
+
 class StateManager:
-    """Manages persistent state across restarts and distributed systems"""
+    """Manages persistent state in memory only"""
     
     def __init__(self):
-        self.backend = Config.STATE_BACKEND
-        self.redis_client = None
-        
-        if self.backend == "redis" and REDIS_AVAILABLE:
-            try:
-                self.redis_client = redis.from_url(Config.REDIS_URL)
-                self.redis_client.ping()
-                logger.info("Connected to Redis for state persistence")
-            except Exception as e:
-                logger.warning(f"Redis connection failed: {e}. Falling back to memory")
-                self.backend = "memory"
-        
-        # In-memory fallback
         self.memory_store = defaultdict(dict)
     
     def get(self, key: str, default=None):
-        """Get value from persistent store"""
-        if self.backend == "redis" and self.redis_client:
-            try:
-                value = self.redis_client.get(key)
-                if value:
-                    return json.loads(value)
-            except Exception as e:
-                logger.error(f"Redis get error: {e}")
-        
+        """Get value from memory store"""
         return self.memory_store.get(key, default)
     
     def set(self, key: str, value, ttl=None):
-        """Set value in persistent store"""
-        if self.backend == "redis" and self.redis_client:
-            try:
-                self.redis_client.set(key, json.dumps(value), ex=ttl)
-                return True
-            except Exception as e:
-                logger.error(f"Redis set error: {e}")
-        
+        """Set value in memory store (ttl ignored for memory)"""
         self.memory_store[key] = value
         return True
     
@@ -162,7 +137,7 @@ class StateManager:
     def update_user_profile(self, username: str, profile: Dict):
         """Update user profile"""
         key = f"user:{username}"
-        self.set(key, profile, ttl=86400 * 7)  # 7 days TTL
+        self.set(key, profile)
 
 # ==================== Data Schemas ====================
 class LoginSchema(pw.Schema):
@@ -374,7 +349,16 @@ def detect_login_anomaly(username: str, location: str, timestamp: str, ip_addres
                 'severity': severity,
                 'type': 'login_anomaly'
             }
-            
+             # RAG ENRICHMENT - NEW CODE
+            if Config.RAG_ENABLE:
+                try:
+                    rag = get_rag_pipeline()
+                    enriched_result = rag.enrich_anomaly(result)
+                    logger.warning(f"LOGIN ANOMALY DETECTED (RAG Enhanced): {username} from {location} (Risk: {risk_score})")
+                    return json.dumps(enriched_result, default=str)
+                except Exception as e:
+                    logger.error(f"RAG enrichment failed for login anomaly: {e}")
+
             logger.warning(f"LOGIN ANOMALY DETECTED: {username} from {location} (Risk: {risk_score})")
             return json.dumps(result, default=str)
             
@@ -425,7 +409,15 @@ def detect_network_anomaly(timestamp: str, requests_per_minute: int, source_ip: 
                 'type': 'network_anomaly',
                 'details': f"Traffic {spike_ratio:.1f}x baseline"
             }
-            
+            if Config.RAG_ENABLE:
+                try:
+                    rag = get_rag_pipeline()
+                    enriched_result = rag.enrich_anomaly(result)
+                    logger.warning(f"LOGIN ANOMALY DETECTED (RAG Enhanced): {username} from {location} (Risk: {risk_score})")
+                    return json.dumps(enriched_result, default=str)
+                except Exception as e:
+                    logger.error(f"RAG enrichment failed for login anomaly: {e}")
+
             logger.warning(f"NETWORK ANOMALY DETECTED: {requests_per_minute} RPM from {source_ip} (Risk: {risk_score})")
             return json.dumps(result, default=str)
             
@@ -508,6 +500,14 @@ def detect_file_anomaly(username: str, timestamp: str, file_size_mb: float,
                 'severity': severity,
                 'type': 'file_anomaly'
             }
+            if Config.RAG_ENABLE:
+                try:
+                    rag = get_rag_pipeline()
+                    enriched_result = rag.enrich_anomaly(result)
+                    logger.warning(f"FILE ANOMALY DETECTED (RAG Enhanced): {username} {operation} {filename} ({file_size_mb}MB - Risk: {risk_score})")
+                    return json.dumps(enriched_result, default=str)
+                except Exception as e:
+                    logger.error(f"RAG enrichment failed for file anomaly: {e}")
             
             logger.warning(f"FILE ANOMALY DETECTED: {username} {operation} {filename} ({file_size_mb}MB - Risk: {risk_score})")
             return json.dumps(result, default=str)
@@ -607,17 +607,17 @@ def main():
         
         pw.io.jsonlines.write(
             login_anomalies,
-            os.path.join(Config.OUTPUT_DIR, "login_anomalies.jsonl")
+            os.path.abspath("output/login_anomalies.jsonl")
         )
         
         pw.io.jsonlines.write(
             network_anomalies,
-            os.path.join(Config.OUTPUT_DIR, "network_anomalies.jsonl")
+            os.path.abspath("output/network_anomalies.jsonl")
         )
         
         pw.io.jsonlines.write(
             file_anomalies,
-            os.path.join(Config.OUTPUT_DIR, "file_anomalies.jsonl")
+            os.path.abspath("output/file_anomalies.jsonl")
         )
         
         logger.info("Output connectors configured successfully")
