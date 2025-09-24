@@ -16,7 +16,7 @@ from pathlib import Path
 import tempfile
 
 class CyberSecurityDataGenerator:
-    def __init__(self, anomaly_rate=0.2):
+    def __init__(self, anomaly_rate=0.8):
         self.anomaly_rate = anomaly_rate
         self.running = False
         
