@@ -20,15 +20,15 @@ pydantic>=2.5.0
 python-dotenv>=1.0.0
 
 # AI and Machine Learning
-openai>=1.0.0
+openai>=1.35.0
 
 # Dashboard and Visualization
 streamlit>=1.28.0
 plotly>=5.17.0
 
-# Knowledge Base and Vector Database (Optional)
-chromadb>=0.4.0
-# pinecone-client>=2.2.0  # Uncomment for Pinecone support
+# Knowledge Base and Vector Database
+chromadb>=0.5.5
+tiktoken>=0.7.0
 
 # Development and Testing
 pytest>=7.4.0
@@ -40,13 +40,5 @@ requests>=2.31.0
 
 # Optional: For production deployment
 # kafka-python>=2.0.0  # Uncomment for Kafka integration
-# boto3>=1.28.0        # Uncomment for AWS Kinesis integration
+# boto3>=1.28.0        # Uncomment for AWS integration
 # redis>=4.6.0         # Uncomment for Redis caching
-# RAG Requirements - NEW
-openai>=1.35.0
-chromadb>=0.5.5
-tiktoken>=0.7.0
-
-# Additional for robust deployment
-logging>=0.4.9.6
-pathlib>=1.0.1
