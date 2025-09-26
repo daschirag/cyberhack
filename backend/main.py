@@ -169,10 +169,14 @@ def get_all_anomalies() -> List[Dict]:
     all_anomalies = []
     
     # Read from all anomaly files
+    # Get the correct path to output directory
+    backend_dir = os.path.dirname(os.path.abspath(__file__))  # backend directory
+    project_root = os.path.dirname(backend_dir)  # parent directory (project root)
+
     anomaly_files = [
-        "../output/login_anomalies.jsonl",
-        "../output/network_anomalies.jsonl", 
-        "../output/file_anomalies.jsonl"
+        os.path.join(project_root, "output", "login_anomalies.jsonl"),
+        os.path.join(project_root, "output", "network_anomalies.jsonl"),
+        os.path.join(project_root, "output", "file_anomalies.jsonl")
     ]
     
     for filepath in anomaly_files:
@@ -257,11 +261,11 @@ async def get_anomalies(limit: int = 50, severity: Optional[str] = None):
     for anomaly in anomalies:
         response.append(AnomalyResponse(
             timestamp=anomaly.get('timestamp', ''),
-            type=anomaly.get('type', 'unknown'),
+            type=anomaly.get('type', 'unknown'), 
             severity=anomaly.get('severity', 'UNKNOWN'),
             risk_score=anomaly.get('risk_score', 0.0),
             details=anomaly,
-            explanation=anomaly.get('explanation', 'No explanation available')
+            explanation=anomaly.get('ai_explanation', anomaly.get('explanation', 'No explanation available'))  # ✅ CORRECT
         ))
     
     return response
@@ -484,10 +488,13 @@ def get_all_anomalies() -> List[Dict]:
     all_anomalies = []
     
     # Read from all anomaly files (existing code)
+    backend_dir = os.path.dirname(os.path.abspath(__file__))  # backend directory
+    project_root = os.path.dirname(backend_dir)  # parent directory (project root)
+
     anomaly_files = [
-        "../output/login_anomalies.jsonl",
-        "../output/network_anomalies.jsonl", 
-        "../output/file_anomalies.jsonl"
+        os.path.join(project_root, "output", "login_anomalies.jsonl"),
+        os.path.join(project_root, "output", "network_anomalies.jsonl"),
+        os.path.join(project_root, "output", "file_anomalies.jsonl")
     ]
     
     for filepath in anomaly_files:

@@ -15,7 +15,11 @@ class LLMService:
     """OpenAI-based LLM service for generating cybersecurity explanations"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=RAGConfig.OPENAI_API_KEY)
+        if not RAGConfig.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is required")
+        self.client = OpenAI(
+            api_key=RAGConfig.OPENAI_API_KEY
+        )
     
     def generate_anomaly_explanation(
         self, 

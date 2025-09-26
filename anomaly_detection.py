@@ -409,14 +409,15 @@ def detect_network_anomaly(timestamp: str, requests_per_minute: int, source_ip: 
                 'type': 'network_anomaly',
                 'details': f"Traffic {spike_ratio:.1f}x baseline"
             }
+            # REPLACE WITH:
             if Config.RAG_ENABLE:
                 try:
                     rag = get_rag_pipeline()
                     enriched_result = rag.enrich_anomaly(result)
-                    logger.warning(f"LOGIN ANOMALY DETECTED (RAG Enhanced): {username} from {location} (Risk: {risk_score})")
+                    logger.warning(f"NETWORK ANOMALY DETECTED (RAG Enhanced): {requests_per_minute} RPM from {source_ip} (Risk: {risk_score})")  # ✅ CORRECT
                     return json.dumps(enriched_result, default=str)
                 except Exception as e:
-                    logger.error(f"RAG enrichment failed for login anomaly: {e}")
+                    logger.error(f"RAG enrichment failed for network anomaly: {e}")  # ✅ CORRECT
 
             logger.warning(f"NETWORK ANOMALY DETECTED: {requests_per_minute} RPM from {source_ip} (Risk: {risk_score})")
             return json.dumps(result, default=str)

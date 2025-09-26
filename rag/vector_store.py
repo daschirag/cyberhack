@@ -21,19 +21,20 @@ class VectorStore:
     def __init__(self):
         self.client = None
         self.collection = None
-        self.openai_client = OpenAI(api_key=RAGConfig.OPENAI_API_KEY)
+        # Fix OpenAI client initialization
+        if not RAGConfig.OPENAI_API_KEY:
+            raise ValueError("OPENAI_API_KEY is required")
+        self.openai_client = OpenAI(
+            api_key=RAGConfig.OPENAI_API_KEY
+        )
         self._initialize_store()
     
     def _initialize_store(self):
         """Initialize ChromaDB client and collection"""
         try:
-            # Initialize ChromaDB client
+            # Initialize ChromaDB client - FIXED VERSION
             self.client = chromadb.PersistentClient(
-                path=RAGConfig.VECTOR_DB_PATH,
-                settings=Settings(
-                    anonymized_telemetry=False,
-                    allow_reset=True
-                )
+                path=RAGConfig.VECTOR_DB_PATH
             )
             
             # Get or create collection
