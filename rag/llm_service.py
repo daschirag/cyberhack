@@ -66,6 +66,7 @@ class LLMService:
                 "recommended_actions": actions,
                 "context_sources": [doc.get("metadata", {}).get("filename", "Unknown") 
                                   for doc in context_documents],
+                "context_documents": context_documents,  # Include full documents
                 "confidence_score": self._calculate_confidence(anomaly, context_documents)
             }
             

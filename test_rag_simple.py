@@ -37,7 +37,7 @@ try:
     print("🧪 Testing anomaly enrichment...")
     result = rag.enrich_anomaly(test_anomaly)
     
-    print(f"✅ Enrichment result:")
+    print(f"✅ Enrichment result:{result}")
     print(f"   Context sources: {len(result.get('context_sources', []))}")
     print(f"   Has AI explanation: {bool(result.get('ai_explanation'))}")
     print(f"   RAG enabled: {result.get('rag_enabled', False)}")

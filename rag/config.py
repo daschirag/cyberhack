@@ -32,7 +32,7 @@ class RAGConfig:
     KNOWLEDGE_BASE_PATH: str = os.path.join(os.path.dirname(__file__), "knowledge_base")
     
     # RAG Parameters
-    SIMILARITY_THRESHOLD: float = 0.3
+    SIMILARITY_THRESHOLD: float = 0.2
     MAX_CHUNK_SIZE: int = 1000
     CHUNK_OVERLAP: int = 200
     

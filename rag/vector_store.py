@@ -37,13 +37,13 @@ class VectorStore:
                 path=RAGConfig.VECTOR_DB_PATH
             )
             
-            # Get or create collection
+            # Get or create collection with default embedding function
             self.collection = self.client.get_or_create_collection(
                 name=RAGConfig.VECTOR_COLLECTION,
                 metadata={
-                    "description": "Cybersecurity knowledge base for anomaly detection",
-                    "embedding_model": RAGConfig.EMBEDDING_MODEL
+                    "description": "Cybersecurity knowledge base for anomaly detection"
                 }
+                # No embedding_function specified = uses ChromaDB default
             )
             
             logger.info(f"Vector store initialized with collection: {RAGConfig.VECTOR_COLLECTION}")
@@ -80,15 +80,12 @@ class VectorStore:
             texts = [doc["text"] for doc in documents]
             metadatas = [doc.get("metadata", {}) for doc in documents]
             
-            # Generate embeddings
-            embeddings = self.generate_embeddings(texts)
-            
-            # Add to collection
+            # Add to collection (let ChromaDB handle embeddings with default function)
             self.collection.upsert(
                 ids=ids,
                 documents=texts,
-                metadatas=metadatas,
-                embeddings=embeddings
+                metadatas=metadatas
+                # No embeddings parameter = uses collection's default embedding function
             )
             
             logger.info(f"Added {len(documents)} documents to vector store")
@@ -104,12 +101,9 @@ class VectorStore:
             top_k = RAGConfig.MAX_CONTEXT_ITEMS
         
         try:
-            # Generate query embedding
-            query_embedding = self.generate_embeddings([query])[0]
-            
-            # Search in collection
+            # Use query_texts instead of query_embeddings to let ChromaDB handle embeddings
             results = self.collection.query(
-                query_embeddings=[query_embedding],
+                query_texts=[query],
                 n_results=top_k,
                 include=["documents", "metadatas", "distances"]
             )

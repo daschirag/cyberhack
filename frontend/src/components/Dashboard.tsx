@@ -1,10 +1,10 @@
 import React from 'react';
-import { useAnomalies } from '../context/AnomalyContext';
-import StatsCards from './dashboard/StatsCards';
-import RecentAlerts from './dashboard/RecentAlerts';
-import ThreatLevel from './dashboard/ThreatLevel';
-import SystemHealth from './dashboard/SystemHealth';
-import ActivityTimeline from './dashboard/ActivityTimeline';
+import { useAnomalies } from '../context/AnomalyContext.tsx';
+import StatsCards from './dashboard/StatsCards.tsx';
+import RecentAlerts from './dashboard/RecentAlerts.tsx';
+import ThreatLevel from './dashboard/ThreatLevel.tsx';
+import SystemHealth from './dashboard/SystemHealth.tsx';
+import ActivityTimeline from './dashboard/ActivityTimeline.tsx';
 
 const Dashboard = () => {
   const { stats, anomalies, loading } = useAnomalies();

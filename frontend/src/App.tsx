@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import Dashboard from './components/Dashboard';
-import Alerts from './components/Alerts';
-import Analytics from './components/Analytics';
-import Settings from './components/Settings';
-import Sidebar from './components/Sidebar';
-import Header from './components/Header';
-import { AnomalyProvider } from './context/AnomalyContext';
+import Dashboard from './components/Dashboard.tsx';
+import Alerts from './components/Alerts.tsx';
+import Analytics from './components/Analytics.tsx';
+import Settings from './components/Settings.tsx';
+import Sidebar from './components/Sidebar.tsx';
+import Header from './components/Header.tsx';
+import { AnomalyProvider } from './context/AnomalyContext.tsx';
 import './index.css';
 
 function App() {

@@ -1,10 +1,11 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { Anomaly, Stats, AnomalyContextType, WebSocketMessage } from '../types/index.ts';
 
-const AnomalyContext = createContext();
+const AnomalyContext = createContext<AnomalyContextType | undefined>(undefined);
 
-export const useAnomalies = () => {
+export const useAnomalies = (): AnomalyContextType => {
   const context = useContext(AnomalyContext);
   if (!context) {
     throw new Error('useAnomalies must be used within an AnomalyProvider');
@@ -12,9 +13,13 @@ export const useAnomalies = () => {
   return context;
 };
 
-export const AnomalyProvider = ({ children }) => {
-  const [anomalies, setAnomalies] = useState([]);
-  const [stats, setStats] = useState({
+interface AnomalyProviderProps {
+  children: ReactNode;
+}
+
+export const AnomalyProvider: React.FC<AnomalyProviderProps> = ({ children }) => {
+  const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
+  const [stats, setStats] = useState<Stats>({
     total_anomalies: 0,
     critical_count: 0,
     high_count: 0,
@@ -23,15 +28,15 @@ export const AnomalyProvider = ({ children }) => {
     last_updated: '',
     system_uptime: ''
   });
-  const [loading, setLoading] = useState(true);
-  const [wsConnection, setWsConnection] = useState(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
 
-  const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   // WebSocket connection for real-time updates
   useEffect(() => {
     const connectWebSocket = () => {
-      const ws = new WebSocket(`ws://localhost:8000/ws`);
+      const ws = new WebSocket(`${import.meta.env.VITE_WS_URL || 'ws://localhost:8000'}/ws`);
       
       ws.onopen = () => {
         console.log('WebSocket connected');

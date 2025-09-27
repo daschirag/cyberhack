@@ -40,6 +40,8 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 # Configure logging
+OPENAI_AVAILABLE = False
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -65,13 +67,18 @@ class Config:
     
     # Directory configuration - Updated for data generator integration
     OUTPUT_DIR = os.path.abspath("./output")
-    DATA_DIR = os.getenv("DATA_DIR", "./data")
+    DATA_DIR = "./data"
     
     # Streaming data directories (created by data generator)
     LOGIN_STREAM_DIR = os.path.join(DATA_DIR, "login_stream")
     NETWORK_STREAM_DIR = os.path.join(DATA_DIR, "network_stream")  
     FILE_STREAM_DIR = os.path.join(DATA_DIR, "file_stream")
-    
+    print(f"LOGIN_STREAM_DIR: {LOGIN_STREAM_DIR}")
+    print(f"NETWORK_STREAM_DIR: {NETWORK_STREAM_DIR}")
+    print(f"FILE_STREAM_DIR: {FILE_STREAM_DIR}")
+    print(f"OUTPUT_DIR: {OUTPUT_DIR}")
+    print(f"DATA_DIR: {DATA_DIR}")
+    # raise Exception("Stop here")
     # # State persistence
     # REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     # STATE_BACKEND = os.getenv("STATE_BACKEND", "memory")  # memory, redis, or rocksdb

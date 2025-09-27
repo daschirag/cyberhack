@@ -320,13 +320,13 @@ class HackathonDemo:
             time.sleep(2)
         
         # Start frontend last (so backend is ready for API calls)
-        print("\n" + "="*30 + " FRONTEND " + "="*30)
-        frontend_process = self.start_frontend()
-        if frontend_process:
-            self.processes.append(frontend_process)
+        # print("\n" + "="*30 + " FRONTEND " + "="*30)
+        # frontend_process = self.start_frontend()
+        # if frontend_process:
+        #     self.processes.append(frontend_process)
             
-            # Wait for frontend to be ready (but don't fail if it takes time)
-            self.wait_for_frontend()
+        #     # Wait for frontend to be ready (but don't fail if it takes time)
+        #     self.wait_for_frontend()
         
         print("\n🎉 Hackathon Demo is running!")
         print("=" * 60)

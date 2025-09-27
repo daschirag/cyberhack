@@ -1,0 +1,13 @@
+[install]
+# Use Bun's faster package manager
+cache = true
+# Use Bun's bundler for better performance
+bun = true
+
+[run]
+# Use Bun's runtime for scripts
+bun = true
+
+[test]
+# Use Bun's test runner
+bun = true
