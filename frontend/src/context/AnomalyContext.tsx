@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
-import { Anomaly, Stats, AnomalyContextType, WebSocketMessage } from '../types/index.ts';
+import { Anomaly, Stats, AnomalyContextType } from '../types/index.ts';
 
 const AnomalyContext = createContext<AnomalyContextType | undefined>(undefined);
 
@@ -119,7 +119,7 @@ export const AnomalyProvider: React.FC<AnomalyProviderProps> = ({ children }) =>
     }
   };
 
-  const handleAlertAction = async (anomalyId, action, notes = '') => {
+  const handleAlertAction = async (anomalyId: string, action: string, notes: string = '') => {
     try {
       await axios.post(`${API_BASE}/api/alerts/${anomalyId}/action`, {
         anomaly_id: anomalyId,
